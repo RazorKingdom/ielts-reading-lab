@@ -115,14 +115,13 @@ app.whenReady().then(async () => {
     rendererJs.includes('稍后复习 · 排入复测') && rendererJs.includes('进入引导训练'),
   )
   check(
-    '工作台介绍性提示文案已清理',
-    !rendererJs.includes('左键点词查词 · 右键点句') &&
-      !rendererJs.includes('文章以纯文本渲染') &&
-      !rendererJs.includes('查看完整解析后，同句训练') &&
-      !rendererJs.includes('随应用离线提供，无请求、无费用') &&
-      !rendererJs.includes('按意群整体理解，不必逐词对应中文') &&
-      !rendererJs.includes('本地词库 · 无需联网或 AI') &&
-      !rendererJs.includes('PARAGRAPH '),
+    '交互引导文案同步为三键语义（正向检查，非僵尸负向串）',
+    // Assert CURRENT guidance is in the bundle. Old negative checks tested
+    // seven strings that never existed in any commit and were always true.
+    rendererJs.includes('中键点句打开操作菜单') &&
+      rendererJs.includes('中键单击一个长句') &&
+      !rendererJs.includes('右键单击一个长句打开解析') &&
+      !rendererJs.includes('右键单击句子打开解析'),
   )
 
   check('离线词库随应用打包', dictionarySize() > 10000, `${dictionarySize()} 条`)
@@ -366,10 +365,15 @@ app.whenReady().then(async () => {
     JSON.stringify(isolation),
   )
 
-  const rejected = await win.webContents.executeJavaScript(
-    '(function () { try { require("electron").ipcRenderer.invoke("lab:invoke", "deleteAllData", []); return "leaked" } catch (e) { return "blocked" } })()',
+  // The preload bridge only exposes LAB_API_METHODS. Assert that a method NOT
+  // on the whitelist is absent, and that no raw key-reading method is exposed.
+  // (The old check used require() in a sandbox, which always throws before
+  // ipcRenderer.invoke is reached - it tested Node isolation, not the whitelist.)
+  const bridge = await win.webContents.executeJavaScript(
+    '(function () { return JSON.stringify({ hasAllowed: typeof window.labAPI.bootstrap, hasForbidden: typeof window.labAPI.getApiKey, hasRawIpc: typeof window.ipcRenderer, keys: Object.keys(window.labAPI || {}).length }) })()',
   )
-  check('渲染进程无法绕过白名单直接调用 ipcRenderer', rejected === 'blocked')
+  const b = JSON.parse(bridge)
+  check('preload 白名单只暴露允许的方法', b.hasAllowed === 'function' && b.hasForbidden === 'undefined' && b.hasRawIpc === 'undefined' && b.keys > 10, JSON.stringify(b))
 
   finish(null)
 }).catch(finish)
