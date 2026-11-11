@@ -14,7 +14,7 @@
 另有两类**历史保留**测试：
 
 - `tests/*.test.ts`（根目录 9 个文件）：早期建立的核心算法测试（segment / validator / machine / runtime / apiProvider / dictionary / articleBank / explanations / benchmark）。它们仍全部运行，不要删除。
-- `scripts/smoke-electron.cjs`：真实 Electron 环境下 51 项端到端自检（SQLite、IPC 白名单、preload 沙箱、React 渲染、字号 CSS 变量、密钥加密、文案哨兵）。运行 `npm run smoke`。
+- `scripts/smoke-electron.cjs`：真实 Electron 环境下 52 项端到端自检（SQLite、IPC 白名单、preload 沙箱、React 渲染、字号 CSS 变量、密钥加密、文案哨兵）。运行 `npm run smoke`。
 
 一次跑全部：
 
@@ -94,7 +94,7 @@ npm run test:all    # 上面两条连跑
 ## 5. 当前覆盖统计（2026-11-11）
 
 - Vitest 总计：**169 项**（根目录历史测试 89 + unit 45 + integration 15 + component 12 + regression 8）
-- Electron smoke：**51 项**
+- Electron smoke：**52 项**
 - 均未使用覆盖率工具；缺口由上文"四层总览"与代码评审确定。
 
 ## 6. 已知不测的内容（诚实边界）
