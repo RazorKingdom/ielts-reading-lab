@@ -8,7 +8,7 @@
 |---|---|
 | 产品 | Windows Electron + React 18 + TS + Vite 的 IELTS 长难句阅读训练应用，个人使用 |
 | 运行 | `npm install && npm start`（桌面）；`npm run dev:web`（浏览器预览，localStorage） |
-| 验证 | `npm run typecheck` / `npm run test`（89 项）/ `npm run smoke`（51 项）/ `npm run build` |
+| 验证 | `npm run typecheck` / `npm run test`（89 项）/ `npm run smoke`（52 项）/ `npm run build` |
 | 数据 | 主进程 sql.js WASM SQLite（`%APPDATA%\ielts-reading-lab\reading-lab.sqlite`）；浏览器预览为 localStorage，两者不互通 |
 | 内置内容 | 100 篇原创 IELTS 风格文章（706–794 词/篇）+ 3,605 句中文译文与英文主谓宾 + 11,828 条 ECDICT 离线词库；全部随包，零网络 |
 | AI | 设置页仅一张「第三方 API（OpenAI 兼容）」卡片；密钥 DPAPI 加密存主进程；默认离线规则兜底不展示 |
@@ -102,8 +102,8 @@ npm run typecheck     # renderer 类型
 npx tsc -p tsconfig.electron.json --noEmit   # 主进程类型
 npm run test          # 89 项单元测试（约 4 s）
 npm run build         # 主进程 + preload bundle + renderer
-npm run smoke         # 51 项 Electron 端到端自检
-npm run package       # 组装免命令行便携版到 release/IELTS Reading Lab v3/
+npm run smoke         # 52 项 Electron 端到端自检
+npm run package       # 组装免命令行便携版到 release/IELTS Reading Lab v4/
 ```
 
 打包说明：`npm run package` 走 `scripts/package-app.cjs`——复制 Electron 运行时 + 把应用放在 `resources/app/` 真实目录（非 asar），sql.js 及 WASM 也在其中，因此 `require('sql.js')` 与 WASM 路径都能解析。`db.ts` 的 `findWasmDir()` 兼容 dev / asar-unpacked / 真实 app 目录三种布局。桌面启动器 `IELTS Reading Lab.cmd` 双击即用（自动清除 `ELECTRON_RUN_AS_NODE`）。设置 `LAB_VERIFY=1` 启动会在 `%APPDATA%\ielts-reading-lab\packaged-probe.json` 写一份健康探针（数据库就绪、IPC 方法数、界面渲染状态），用于验证打包产物。
