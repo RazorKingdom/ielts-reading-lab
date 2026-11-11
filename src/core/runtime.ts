@@ -26,6 +26,7 @@ import { analysisWithOffline } from './explanations'
 import { createArticle } from './segment'
 import { createSampleArticles, ARTICLE_BANK_VERSION } from './samples'
 import { createProvider, ProviderError, providerErrorMessage } from './diagnose'
+import type { ErrorKind } from './diagnose'
 import { THIRD_PARTY_CAPABILITY } from './apiProvider'
 import { validateDiagnosis } from './validator'
 import { canSubmit, decide, isUnknownAnswer, observationResult, POLICY_LIMITS } from './machine'
@@ -249,7 +250,8 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
       case 'DIAGNOSE':
         return ['EXIT']
       case 'DIAGNOSE_FAILED':
-        return ['RETRY_DIAGNOSIS', 'UNLOCK_LEVEL3', 'EXIT', 'DISPUTE']
+        // No diagnosis exists to dispute; only recovery actions are valid.
+        return ['RETRY_DIAGNOSIS', 'UNLOCK_LEVEL3', 'EXIT']
       case 'CLARIFY':
       case 'RETRY':
         return attempts.length < POLICY_LIMITS.maxAttempts
@@ -367,10 +369,11 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
       const kind = err instanceof ProviderError ? err.errorKind : 'NETWORK'
       s.state = 'DIAGNOSE_FAILED'
       s.lastError = kind
+      s.lastErrorNote = providerErrorMessage(kind)
       await store.putSession(s)
       return snapshot(
         s,
-        `${providerErrorMessage(kind)}（错误类别：${kind}；你的第 ${attempt.sequence} 次回答已完整保存，可点「重试诊断」，不会重复写 session。）`,
+        `${s.lastErrorNote}（错误类别：${kind}；你的第 ${attempt.sequence} 次回答已完整保存，可点「重试诊断」，不会重复写 session。）`,
       )
     }
 
@@ -378,6 +381,7 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
     if (!validation.valid) {
       s.state = 'DIAGNOSE_FAILED'
       s.lastError = raw?.evidences?.length ? 'EVIDENCE_INSUFFICIENT' : 'INVALID_STRUCTURE'
+      s.lastErrorNote = providerErrorMessage(s.lastError as ErrorKind)
       await store.putSession(s)
       return snapshot(
         s,
@@ -413,6 +417,7 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
       sessionId: s.id,
       action: decisionOutcome.action,
       reasonCodes: decisionOutcome.reasonCodes,
+      policyNote: decisionOutcome.policyNote,
       evidenceIds: diagnosis.evidences.map((e) => e.targetId),
       policyVersion: POLICY_VERSION,
       createdAt: iso(),
@@ -430,6 +435,7 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
     } else if (action === 'PASS') {
       s.state = 'PASS'
       await addFeedback(s, 0, 'pass', `${diagnosis.summary} 本层不展示解析，以保持独立测评条件。`)
+      notice = '核心理解正确，本句判定通过；不展示解析以保持独立测评，可继续做迁移题或结束本轮。'
     } else if (action === 'CLARIFY') {
       s.state = 'CLARIFY'
       s.clarifyCount += 1
@@ -793,6 +799,11 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
         }
 
         case 'DISPUTE': {
+          // Never let the user dispute a diagnosis that was never produced.
+          if (!await store.getDiagnosis(s.id)) {
+            notice = '本次还没有生成诊断，无法标记为争议。'
+            break
+          }
           s.disputed = true
           await addFeedback(
             s,
@@ -881,6 +892,11 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
       if (!cfg.hasKey) return { ok: false, message: '请先填写并保存 API Key。' }
       if (!cfg.model.trim() || !cfg.baseUrl.trim()) {
         return { ok: false, message: '请先填写 Base URL 与模型名。' }
+      }
+      // A connection test is a real (billable) request. Never send one without
+      // the same explicit cost confirmation that gates diagnosis itself.
+      if (!cfg.costConfirmed) {
+        return { ok: false, message: '请先在设置里勾选费用确认，再测试连接（测试会发出真实请求）。' }
       }
       try {
         const provider = await factory('third-party-api')
