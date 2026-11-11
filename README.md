@@ -2,7 +2,7 @@
 
 离线可用的 IELTS 学术阅读训练软件：100 篇原创练习文章、逐句中文译文与英文主谓宾、完全离线的 ECDICT 查词、证据驱动的中文自由表达诊断、L0–L3 渐进反馈，可选接入 OpenAI 兼容第三方 API 做真实模型诊断。
 
-**当前状态（2026-11-10）：已交付可运行 MVP；89 项单测 + 51 项 Electron 自检全通过；真实 Key 链路已实测但目标端点返回 503，未拿到模型输出。**
+**当前状态（2026-11-10）：已交付可运行 MVP；89 项单测 + 52 项 Electron 自检全通过；真实 Key 链路已实测但目标端点返回 503，未拿到模型输出。**
 
 ## 文档入口（按你的角色读）
 
@@ -53,9 +53,9 @@ npm start            # 构建并启动桌面应用
 `npm start` 会先执行 `npm run build`（编译主进程 + Vite 打包渲染进程），再启动 Electron。其他命令：
 
 ```bash
-npm run smoke        # Electron + SQLite / 加密凭据端到端自检（51 项）
+npm run smoke        # Electron + SQLite / 加密凭据端到端自检（52 项）
 npm run dev:web      # 纯浏览器预览（localStorage，不互通，仅看界面）
-npm run package      # 构建并组装免命令行的便携版到 release/IELTS Reading Lab v3/
+npm run package      # 构建并组装免命令行的便携版到 release/IELTS Reading Lab v4/
 ```
 
 `npm run package` 用 `scripts/package-app.cjs` 直接组装（复制 Electron 运行时 + 把应用放在 `resources/app/` 真实目录），不依赖 electron-builder 的临时目录重命名，便于在受限环境打包。`npm run dist` 是 electron-builder 标准路径，普通 Windows 环境可用。

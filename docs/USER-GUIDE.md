@@ -6,7 +6,7 @@
 
 ### 已打包应用（推荐，无需命令行）
 
-桌面上有一个 **`IELTS Reading Lab.cmd`** 启动器——**双击它即可打开应用**，不需要命令行。它会自动清除环境变量并启动 `release\IELTS Reading Lab v3\IELTS Reading Lab.exe`（整个目录可拷贝到别处或分发，数据仍存当前用户的 `%APPDATA%\ielts-reading-lab`，与程序目录分离）。
+桌面上有一个 **`IELTS Reading Lab.cmd`** 启动器——**双击它即可打开应用**，不需要命令行。它会自动清除环境变量并启动 `release\IELTS Reading Lab v4\IELTS Reading Lab.exe`（整个目录可拷贝到别处或分发，数据仍存当前用户的 `%APPDATA%\ielts-reading-lab`，与程序目录分离）。
 
 打包应用位于 `release\IELTS Reading Lab v2\IELTS Reading Lab.exe`（整个目录可拷贝到任意位置或分发给别人，数据仍存在当前用户的 `%APPDATA%\ielts-reading-lab`，与程序目录分离）。
 
@@ -54,7 +54,7 @@ npm start            # 构建并打开桌面应用
 
 中键选「直接解析」（或点工具栏「解析栏」）后右侧显示：
 
-- **结构 / Structure**：英文原句里的 Subject（主语）、Predicate（谓语）、Object（宾语），取自原句片段，不是中文翻译。
+- **结构 / Structure**：三行 k-v —— 主语 / 谓语 / 宾语·表语，值是**英文原句里的对应片段**，不是中文翻译。
 - **意群 / Chunks**：按语义切分的英文片段及作用标签。
 - **语义 / Meaning**：整句中文参考译文。
 - **词组 / Phrases**：句中出现的常见学术词组及语境义。

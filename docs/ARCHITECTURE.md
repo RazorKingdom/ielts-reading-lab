@@ -121,4 +121,4 @@ SQLite `records` 表（append-only）：`seq / kind / id / payload`。`kind` 包
 | `dictionary.test.ts` | 精确/词形还原/未收录/点击位置取词（7 项） |
 | `explanations.test.ts` | 3,605 句骨架覆盖、英文片段、targets 不变、导入句回落（6 项） |
 
-`scripts/smoke-electron.cjs` 是真实 Electron 端到端自检（51 项），覆盖 SQLite 持久化与重启恢复、IPC 白名单、sandbox preload、React 渲染、字号 CSS 变量、右键交互、文案清理、密钥加密与导出排除。
+`scripts/smoke-electron.cjs` 是真实 Electron 端到端自检（52 项），覆盖 SQLite 持久化与重启恢复、IPC 白名单、sandbox preload、React 渲染、字号 CSS 变量、右键交互、文案清理、密钥加密与导出排除。
