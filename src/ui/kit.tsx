@@ -75,7 +75,23 @@ export function statusLabel(status: string): string {
   const map: Record<string, string> = {
     correct: '正确', incorrect: '明确错误', partial: '部分理解', insufficient: '证据不足', disputed: '有争议',
     'independent-correct': '首次独立正确', 'assisted-correct': '提示后正确', unscored: '不计分',
-    PASS: 'PASS', CLARIFY: 'CLARIFY', RETRY: 'RETRY', EXPLAIN: 'EXPLAIN', TRANSFER: 'TRANSFER',
+    PASS: '判定通过', CLARIFY: '中性追问', RETRY: '二次表达', EXPLAIN: '给出完整解析', TRANSFER: '迁移练习',
   }
   return map[status] ?? status
+}
+
+/** Human-readable teaching-decision reason codes (persisted as ASCII IDs). */
+export function reasonLabel(code: string): string {
+  const map: Record<string, string> = {
+    'core-understanding-correct': '核心理解正确',
+    'one-neutral-clarification-allowed': '允许一次中性追问',
+    'important-detail-not-expressed': '关键细节未表达',
+    'auto-clarify-limit-reached': '已达追问上限',
+    'explicit-conflict-with-source': '与原句明确冲突',
+    'local-error-self-correctable': '局部错误可自行纠正',
+    're-expression-limit-reached': '已达二次表达上限',
+    'answer-already-revealed': '答案已暴露',
+    'disputed-items-excluded-from-ability-update': '争议项不计入能力更新',
+  }
+  return map[code] ?? code
 }
