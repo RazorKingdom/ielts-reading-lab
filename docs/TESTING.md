@@ -95,7 +95,7 @@ npm run test:all    # 上面两条连跑
 
 ## 5. 当前覆盖统计（2026-11-11）
 
-- Vitest 总计：**183 项**（根目录历史测试 89 + unit 45 + integration 16 + component 19 + regression 14）
+- Vitest 总计：**190 项**（根目录历史测试 89 + unit 45 + integration 16 + component 19 + regression 21）
   - 注：根目录 89 项里有 20 项由 `benchmark.test.ts` 顶层循环动态生成，静态数 `it(` 会少算。用 `vitest --reporter=json` 统计才准确。
 - Electron smoke：**52 项**
 - 真实鼠标输入验证：`npm run verify:middleclick`（见 §7），已纳入 `npm run test:all`
