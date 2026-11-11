@@ -1,0 +1,105 @@
+# 测试体系说明 — IELTS Reading Lab
+
+> 现行文档，2026-11-11。目标：任何人改动代码后，知道**跑什么、加什么测试**，让回归风险可见。
+
+## 1. 四层测试总览
+
+| 层 | 位置 | 环境 | 测什么 | 命令 |
+|---|---|---|---|---|
+| **单元测试** | `tests/unit/` | node | 纯函数与单个类的所有分支：hash、迁移题、状态机裁决、Validator、secureStore 异常路径、IPC 白名单 | `npm run test:unit` |
+| **集成测试** | `tests/integration/` | node | 多模块协作的数据流：runtime dispatch 意图矩阵、费用闸门、store 持久化与导出、曝光记录 | `npm run test:integration` |
+| **功能测试** | `tests/component/` | jsdom | 真实 DOM 事件 → 状态/API 调用：Reader 三键交互、Settings 费用闸门 UI | `npm run test:component` |
+| **回归测试** | `tests/regression/` | node | 已修复 bug 的哨兵 + 黄金路径：span 截断、3,605 句解析完整、答案曝光归因、费用闸门 | `npm run test:regression` |
+
+另有两类**历史保留**测试：
+
+- `tests/*.test.ts`（根目录 9 个文件）：早期建立的核心算法测试（segment / validator / machine / runtime / apiProvider / dictionary / articleBank / explanations / benchmark）。它们仍全部运行，不要删除。
+- `scripts/smoke-electron.cjs`：真实 Electron 环境下 51 项端到端自检（SQLite、IPC 白名单、preload 沙箱、React 渲染、字号 CSS 变量、密钥加密、文案哨兵）。运行 `npm run smoke`。
+
+一次跑全部：
+
+```bash
+npm run test        # Vitest 全部（root + 四层）
+npm run smoke       # Electron 端到端
+npm run test:all    # 上面两条连跑
+```
+
+## 2. 关键约定
+
+### 2.1 组件测试用 jsdom，其余用 node
+
+组件测试文件第一行必须写：
+
+```ts
+// @vitest-environment jsdom
+```
+
+`tests/setup.ts` 提供统一的 DOM polyfill（`CSS.escape`、`caretRangeFromPoint`、`requestAnimationFrame`）与 `afterEach(cleanup)`，保证用例间 DOM 隔离。
+
+### 2.2 mock 边界
+
+- **组件测试必须 mock `src/backend.ts`**：它是模块顶层副作用（`export const api = getBackend()`），不 mock 会牵连 localStorage。
+- **secureStore 测试只 mock `electron` 的 safeStorage**：用真实临时目录 + 真实 fs，通过 `vi.resetModules()` 拿到干净模块实例（该模块有 `cached` 模块级状态）。
+- **runtime 集成测试用 `tests/helpers.ts` 的 `makeRuntime()`**：内存 store + 可 restart，无需真实数据库。
+
+### 2.3 测试命名
+
+- 单元测试：`unit: <模块> <行为>`，一个 `it` 只测一个分支。
+- 集成测试：`integration: <流程> <场景>`。
+- 功能测试：`component: <组件> <交互>`。
+- 回归测试：`regression: <原始 bug 描述>`——**名字里要写清原来的症状**，例如 `span truncation ("...earliest f")`，这样未来看到失败就知道破坏了什么。
+
+## 3. 三种鼠标交互的测试分工（重要）
+
+这是当前最容易回归的区域，测试分层如下：
+
+| 断言 | 在哪测 | 为什么 |
+|---|---|---|
+| 右键弹出语义悬浮窗、显示译文 | `tests/component/Reader.interactions.test.tsx` 真实派发 `contextmenu` | 静态字符串只能证明文案进了 bundle |
+| **右键不调用 `markAnalysisViewed`**（不破坏无提示训练归因） | 同上，`expect(apiMock.markAnalysisViewed).not.toHaveBeenCalled()` | 这是核心业务不变量 |
+| 中键 `button===1` 才弹三选菜单 | 同上，派发 `auxclick` 并先测 `button=0` 不弹 | `onClick` 只响应左键，中键必须走 `onAuxClick` |
+| 三个菜单项分别触发解析 / 训练 / 复测 | 同上，逐项 click 后断言 API 调用 | 行为级验证 |
+| 打包产物含新交互文案 | `scripts/smoke-electron.cjs` 字符串哨兵 | 防止构建漏打包，不是行为测试 |
+
+**不要把组件测试降级成字符串检查，也不要在 smoke 里重复搭复杂 UI 导航。**
+
+## 4. 每次改动的回归流程
+
+1. **改前**：确认相关层已有测试。用 `grep -rn "<关键词>" tests/` 找。
+2. **改时**：如果修复了一个 bug，在 `tests/regression/known-bugs.test.ts` 加一条哨兵，名字写原症状。
+3. **改后**：
+
+   ```bash
+   npm run typecheck       # 类型
+   npm run test:unit       # 纯逻辑分支
+   npm run test:integration# 数据流
+   npm run test:component  # UI 交互（改了 Reader/Settings 必跑）
+   npm run test:regression # 历史 bug 哨兵
+   npm run smoke           # Electron 端到端（改了构建/主进程必跑）
+   ```
+
+4. **提交前**：`git status` 确认无意外文件；密钥不得出现在任何测试快照中。
+
+### 按改动类型选测试
+
+| 你改了什么 | 必跑 |
+|---|---|
+| `src/core/*` 算法 | test:unit + test:integration + test:regression |
+| `src/ui/Reader.tsx` | test:component（必）+ test:regression |
+| `src/ui/Settings.tsx` | test:component |
+| `electron/*` 或打包脚本 | test:unit（secureStore 部分）+ smoke + 手动启动验证 |
+| `scripts/generate-article-bank.mjs` | test:regression + articleBank.test.ts（词数/ID/哈希护栏） |
+| 文档 | 无；但同步更新数字与路径 |
+
+## 5. 当前覆盖统计（2026-11-11）
+
+- Vitest 总计：**169 项**（根目录历史测试 89 + unit 45 + integration 15 + component 12 + regression 8）
+- Electron smoke：**51 项**
+- 均未使用覆盖率工具；缺口由上文"四层总览"与代码评审确定。
+
+## 6. 已知不测的内容（诚实边界）
+
+- **真实模型诊断质量**：没有真实 API Key 的成功输出，无法做误判率/证据准确率评测（见 `DELIVERY.md` §8）。
+- **真人 GUI 视觉验收**：自动化不截图比对像素；字号用 DOM 计算值验证，布局美观需人工看。
+- **其他 UI 组件**（Library / Profile / Focus）：目前只有 smoke 的渲染启动检查，无组件级行为测试。
+- **performance / 长时间运行**：未做压力或内存泄漏测试。

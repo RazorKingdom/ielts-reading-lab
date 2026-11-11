@@ -11,7 +11,7 @@
 | **最终用户** | [`docs/USER-GUIDE.md`](docs/USER-GUIDE.md) — 安装、启动、阅读/训练/查词/设置/备份 | 本文件「开发交付」小节 |
 | **接手开发的 Agent / 工程师** | [`docs/ONBOARDING.md`](docs/ONBOARDING.md) — 文档地图、当前架构、模块索引、改动场景、红线 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) + [`docs/DELIVERY.md`](docs/DELIVERY.md) |
 | **教学规则 / 诊断质量** | [`docs/CONTRACT.md`](docs/CONTRACT.md) — 证据规则、L0–L3、状态机与裁决策略、人工基准 | `tests/benchmark.test.ts` |
-| **测试 / 验收** | [`docs/DELIVERY.md`](docs/DELIVERY.md) §4/§8 + `tests/` | [`docs/CONTRACT.md`](docs/CONTRACT.md) §验收用例 |
+| **测试 / 验收** | [`docs/TESTING.md`](docs/TESTING.md) — 四层测试体系与改动回归流程 | [`docs/DELIVERY.md`](docs/DELIVERY.md) §4/§8 + `tests/` |
 | **项目历史 / 真实性边界** | [`docs/POC-RESULT.md`](docs/POC-RESULT.md) — 阶段 0 核查（结论 BLOCKED，不代表当前架构） | [`docs/DELIVERY.md`](docs/DELIVERY.md) §8 |
 
 > ℹ️ 早期的设计构想文档（产品与架构、测试计划、开发 Agent 提示词）已移除，不再随项目分发。它们当中**仍然有效的部分**——教学契约、诊断证据规则、验收原则——已整理进 [`docs/CONTRACT.md`](docs/CONTRACT.md)；其余被后续范围变更取代的内容不要恢复。当前事实以本表所列的现行文档为准。

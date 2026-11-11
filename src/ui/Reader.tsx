@@ -210,6 +210,10 @@ export default function Reader({
   function onSentenceClick(e: ReactMouseEvent) {
     const selected = window.getSelection()?.toString().trim() ?? ''
     const word = selected || wordAtPointer(e.clientX, e.clientY)
+    // A left click dismisses the right-click meaning popover and the middle
+    // menu: starting a new interaction should not leave stale layers open.
+    setSentenceTool(null)
+    setSentenceMenu(null)
     if (!word) {
       setWordTool(null)
       return

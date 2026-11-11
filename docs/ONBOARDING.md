@@ -23,6 +23,7 @@
 README.md                    入口导航 + 快速命令（先读）
 docs/ONBOARDING.md           本文：接手指南（再读）
 docs/CONTRACT.md             教学契约：证据规则、L0–L3、状态机、D01–D12 基准
+docs/TESTING.md              四层测试体系与每次改动的回归流程
 docs/ARCHITECTURE.md         代码结构、数据流、关键不变量（动手前读）
 docs/USER-GUIDE.md           最终用户视角的功能说明（理解交互语义）
 docs/DELIVERY.md             交付状态、已实现/未实现、测试结果、风险（v0.2.0）

@@ -87,6 +87,9 @@ app.whenReady().then(async () => {
 
   // Interaction: left = word, right = compact meaning popover, middle = the
   // three-choice action menu (direct analysis / derived training / review).
+  // These bundle-string checks are regression sentinels only: the real DOM
+  // dispatch + API-attribution assertions live in
+  // tests/component/Reader.interactions.test.tsx (run via `npm run test:component`).
   const rendererJs = fs.readFileSync(
     path.join(ROOT, 'dist', 'assets', fs.readdirSync(path.join(ROOT, 'dist', 'assets')).find((f) => f.endsWith('.js'))),
     'utf8',

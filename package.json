@@ -21,7 +21,12 @@
     "build:dictionary": "node scripts/build-dictionary.mjs",
     "dist": "npm run build && electron-builder --win --x64",
     "dist:dir": "npm run build && electron-builder --win --x64 --dir",
-    "package": "npm run build && node scripts/package-app.cjs"
+    "package": "npm run build && node scripts/package-app.cjs",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:component": "vitest run tests/component",
+    "test:regression": "vitest run tests/regression",
+    "test:all": "vitest run && npm run smoke"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -29,6 +34,9 @@
     "sql.js": "^1.13.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.9",
     "@types/node": "^22.10.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
@@ -38,6 +46,7 @@
     "electron": "^33.2.0",
     "electron-builder": "^26.18.0",
     "esbuild": "^0.21.5",
+    "jsdom": "^31.0.0",
     "typescript": "^5.7.2",
     "vite": "^5.4.11",
     "vitest": "^2.1.8",
@@ -61,8 +70,18 @@
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "zip", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.png"
     },

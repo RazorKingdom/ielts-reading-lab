@@ -21,7 +21,11 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    // Unit / integration / regression use the node environment (the default).
+    // Component tests opt into jsdom via a per-file docblock:
+    //   // @vitest-environment jsdom
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
+    setupFiles: ['tests/setup.ts'],
     globals: true,
     // Single-process execution avoids concurrent writes to Vite's SSR dep
     // cache, which is blocked by the desktop sandbox on Windows.
