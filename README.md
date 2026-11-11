@@ -2,7 +2,7 @@
 
 离线可用的 IELTS 学术阅读训练软件：100 篇原创练习文章、逐句中文译文与英文主谓宾、完全离线的 ECDICT 查词、证据驱动的中文自由表达诊断、L0–L3 渐进反馈，可选接入 OpenAI 兼容第三方 API 做真实模型诊断。
 
-**当前状态（2026-11-10）：已交付可运行 MVP；88 项单测 + 50 项 Electron 自检全通过；真实 Key 链路已实测但目标端点返回 503，未拿到模型输出。**
+**当前状态（2026-11-10）：已交付可运行 MVP；89 项单测 + 50 项 Electron 自检全通过；真实 Key 链路已实测但目标端点返回 503，未拿到模型输出。**
 
 ## 文档入口（按你的角色读）
 
@@ -38,23 +38,33 @@
 
 ---
 
+## 从零开始（克隆仓库后）
+
+本仓库只含源码与文档，**所有依赖与构建产物均不入库**。在 Windows 上（Node.js 22+ / npm）执行：
+
+```bash
+git clone <本仓库地址>
+cd 英语阅读训练软件
+npm install          # 安装依赖（含 Electron 二进制与 sql.js WASM）
+npm run test         # 89 项单元测试，确认源码完整
+npm start            # 构建并启动桌面应用
+```
+
+`npm start` 会先执行 `npm run build`（编译主进程 + Vite 打包渲染进程），再启动 Electron。其他命令：
+
+```bash
+npm run smoke        # Electron + SQLite / 加密凭据端到端自检（50 项）
+npm run dev:web      # 纯浏览器预览（localStorage，不互通，仅看界面）
+npm run package      # 构建并组装免命令行的便携版到 release/IELTS Reading Lab v2/
+```
+
+`npm run package` 用 `scripts/package-app.cjs` 直接组装（复制 Electron 运行时 + 把应用放在 `resources/app/` 真实目录），不依赖 electron-builder 的临时目录重命名，便于在受限环境打包。`npm run dist` 是 electron-builder 标准路径，普通 Windows 环境可用。
+
+若从某些终端启动后没有窗口，是宿主注入了 `ELECTRON_RUN_AS_NODE=1`；`scripts/start-app.cmd` 已自动清除，或手动用 `ELECTRON_RUN_AS_NODE= npm start`。
+
 ## 开发交付（2026-11-10）
 
 初版按「完整可运行 MVP + 内置 Mock/规则 Provider」实现；**2026-11-10 后续按用户要求改为：设置页只保留一个 OpenAI 兼容第三方 API，并接入真实调用**。SIWC / 本地模型 / Codex 等旧 Provider 已从界面与注册表中移除，内部只保留不展示的离线兜底。阶段 0 的官方真人授权验证从未执行，详见 `docs/POC-RESULT.md`；完整交付说明见 `docs/DELIVERY.md`。
-
-```bash
-npm install
-npm run test        # 88 项单元测试
-npm run smoke       # Electron + SQLite / 加密凭据端到端自检（50 项）
-npm start           # 构建并启动 Windows 桌面应用
-npm run dev:web     # 纯浏览器预览（localStorage，仅用于界面预览）
-```
-
-**无需命令行的使用方式**：双击桌面上的 `IELTS Reading Lab.cmd` 启动器即可打开已打包的应用（位于 `release/IELTS Reading Lab v2/`）。整个目录可拷贝/分发。
-
-从源码重新打包：`npm run package`（构建后用 `scripts/package-app.cjs` 组装成 `release/IELTS Reading Lab v2/`，无需 electron-builder 的临时目录重命名，规避沙箱环境限制）。`npm run dist` 是 electron-builder 的标准打包路径，在普通 Windows 环境可用；本环境的批量删除保护会拦截其重命名步骤，故默认用 `npm run package`。
-
-Windows 也可直接双击 `scripts/start-app.cmd`。若从 Electron 宿主终端启动失败，需清除宿主注入的 `ELECTRON_RUN_AS_NODE` 环境变量，桌面启动器与 `scripts/start-app.cmd` 已自动处理。
 
 ### 第三方 API（OpenAI 兼容）
 
