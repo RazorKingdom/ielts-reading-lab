@@ -95,6 +95,12 @@ app.whenReady().then(async () => {
     'utf8',
   )
   check(
+    '结构块字段名为中文（主语 / 谓语 / 宾语·表语）',
+    rendererJs.includes('宾语 / 表语') &&
+      !rendererJs.includes('kv-key">Subject') &&
+      !rendererJs.includes('kv-key">Predicate'),
+  )
+  check(
     '右键语义悬浮窗存在（扇贝式，不标曝光）',
     rendererJs.includes('句子语义') && rendererJs.includes('st-meaning') &&
       rendererJs.includes('中键点句展开完整解析与训练'),
