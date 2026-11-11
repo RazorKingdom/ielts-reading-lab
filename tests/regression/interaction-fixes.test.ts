@@ -67,21 +67,40 @@ describe('regression: policy notes and PASS notices', () => {
     expect(d.action).toBe('EXPLAIN')
   })
 
-  it('a correct answer still yields PASS (now with a user notice)', () => {
+  it('a correct answer yields PASS with a visible user notice', async () => {
     const d = decide({
       evidences: [ev('correct')],
       attemptSequence: 1, clarifyCount: 0, retryCount: 0,
       answerRevealed: false,
     })
     expect(d.action).toBe('PASS')
+    // The notice is produced by runtime.ts, not by decide(): assert it through
+    // the real pipeline so a removed notice is caught.
+    const { api } = makeRuntime()
+    const { session } = await api.startSession(makeSessionInput(D01))
+    const snap = await api.dispatch(session.id, { type: 'SUBMIT', text: '技术提高生产率的程度取决于员工使用技术有多有效。' })
+    expect(snap.session.state).toBe('PASS')
+    expect(snap.notice).toContain('判定通过')
   })
 
-  it('testApiConnection refuses to send without cost confirmation', async () => {
+  it('testApiConnection blocks every missing prerequisite before any request', async () => {
+    // Distinguishes the three guards; the plain costConfirmed case lives in
+    // tests/integration/dispatch-branches.test.ts (avoid duplicate sentinels).
     const { api } = makeRuntime()
-    await api.setApiKey('sk-test')
-    await api.setApiConfig({ model: 'm', baseUrl: 'https://example.com/v1', costConfirmed: false })
-    const r = await api.testApiConnection()
+    let r = await api.testApiConnection()
     expect(r.ok).toBe(false)
-    expect(r.message).toContain('费用确认')
+    expect(r.message).toContain('API Key')
+
+    await api.setApiKey('sk-test')
+    r = await api.testApiConnection()
+    expect(r.ok).toBe(false)
+    expect(r.message).toContain('Base URL')
+
+    await api.setApiConfig({ model: 'm', baseUrl: 'https://example.com/v1', costConfirmed: true })
+    r = await api.testApiConnection()
+    // All guards passed, but the default provider has no testConnection: must
+    // fail gracefully instead of throwing (and must not send any request).
+    expect(r.ok).toBe(false)
+    expect(r.message).toContain('不支持连接测试')
   })
 })
