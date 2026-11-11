@@ -30,6 +30,7 @@ import type { ErrorKind } from './diagnose'
 import { THIRD_PARTY_CAPABILITY } from './apiProvider'
 import { validateDiagnosis } from './validator'
 import { canSubmit, decide, isUnknownAnswer, observationResult, POLICY_LIMITS } from './machine'
+import type { Decision } from './machine'
 import { buildTransferExercise, evaluateTransfer, makeReviewTask } from './exercise'
 
 /* ----------------------------- storage port ----------------------------- */
@@ -242,21 +243,31 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
     analysis: SentenceAnalysis,
     diagnosis: Diagnosis | null,
   ): Promise<TrainingIntent['type'][]> {
-    const base: TrainingIntent['type'][] = ['EXIT', 'UNLOCK_LEVEL3', 'DISPUTE']
+    const exposed = s.answerRevealed || s.currentLevel >= 3 || s.directAnalysisSeen
+    // Once the full answer has been shown there is no "deeper hint" left.
+    // Keeping REQUEST_HINT/UNLOCK_LEVEL3 available would let the user append
+    // unlimited duplicate L3 rows and see a nonexistent "L4" button.
+    const base: TrainingIntent['type'][] = exposed
+      ? ['EXIT', 'DISPUTE']
+      : ['EXIT', 'UNLOCK_LEVEL3', 'DISPUTE']
     switch (s.state) {
       case 'PREPARE':
       case 'ATTEMPT':
-        return ['SUBMIT', 'SET_DRAFT', 'UNLOCK_LEVEL3', 'EXIT']
+        return exposed
+          ? ['SUBMIT', 'SET_DRAFT', 'EXIT']
+          : ['SUBMIT', 'SET_DRAFT', 'UNLOCK_LEVEL3', 'EXIT']
       case 'DIAGNOSE':
         return ['EXIT']
       case 'DIAGNOSE_FAILED':
         // No diagnosis exists to dispute; only recovery actions are valid.
         return ['RETRY_DIAGNOSIS', 'UNLOCK_LEVEL3', 'EXIT']
       case 'CLARIFY':
-      case 'RETRY':
+      case 'RETRY': {
+        const hint = exposed ? [] : ['REQUEST_HINT' as TrainingIntent['type']]
         return attempts.length < POLICY_LIMITS.maxAttempts
-          ? ['SUBMIT', 'SET_DRAFT', 'REQUEST_HINT', ...base]
-          : ['REQUEST_HINT', ...base]
+          ? ['SUBMIT', 'SET_DRAFT', ...hint, ...base]
+          : [...hint, ...base]
+      }
       case 'PASS': {
         const canTransfer =
           !!diagnosis &&
@@ -268,7 +279,9 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
       case 'EXPLAIN':
         return ['SKIP_TRANSFER', ...base]
       case 'TRANSFER':
-        return ['SUBMIT_TRANSFER', 'SKIP_TRANSFER', 'UNLOCK_LEVEL3', 'EXIT', 'DISPUTE']
+        // Never offer L3 here: level3Content() would reveal the transfer
+        // sentence's reference meaning before the learner has answered.
+        return ['SUBMIT_TRANSFER', 'SKIP_TRANSFER', 'EXIT', 'DISPUTE']
       case 'COMPLETE':
         return ['EXIT']
       default:
@@ -297,7 +310,11 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
   }
 
   function level3Content(s: TrainingSession, analysis: SentenceAnalysis): string {
-    const transfer = s.transfer ? `\n\n迁移句参考含义：${s.transfer.meaning}` : ''
+    // Never reveal the transfer sentence's answer while the learner is still
+    // supposed to solve it: the transfer reference is shown only AFTER submit.
+    const transfer = s.transfer && s.state !== 'TRANSFER'
+      ? `\n\n迁移句参考含义：${s.transfer.meaning}`
+      : ''
     return [
       `参考理解：${analysis.meaning}`,
       ...analysis.layers.map((l, i) => `${i + 1}. ${l}`),
@@ -404,14 +421,24 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
     await store.putDiagnosis(diagnosis)
 
     // The model suggests; the application state machine decides.
-    const decisionOutcome = decide({
-      evidences: diagnosis.evidences,
-      attemptSequence: attempt.sequence,
-      clarifyCount: s.clarifyCount,
-      retryCount: s.retryCount,
-      answerRevealed: s.answerRevealed,
-      suggestedAction: diagnosis.suggestedAction,
-    })
+    // "I don't know" is resolved BEFORE decide() so the persisted decision
+    // matches the resulting EXPLAIN state (previously the record said CLARIFY
+    // while the UI showed a full L3 explanation).
+    const unknown = isUnknownAnswer(attempt.userText)
+    const decisionOutcome: Decision = unknown
+      ? {
+        action: 'EXPLAIN',
+        reasonCodes: ['unknown-answer-direct-explanation'],
+        policyNote: '你表示暂时不理解，应用跳过追问，直接给出完整解析。',
+      }
+      : decide({
+        evidences: diagnosis.evidences,
+        attemptSequence: attempt.sequence,
+        clarifyCount: s.clarifyCount,
+        retryCount: s.retryCount,
+        answerRevealed: s.answerRevealed,
+        suggestedAction: diagnosis.suggestedAction,
+      })
     await store.addDecision({
       id: makeId('dec'),
       sessionId: s.id,
@@ -425,7 +452,7 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
 
     const action = decisionOutcome.action
     let notice: string | undefined
-    if (isUnknownAnswer(attempt.userText)) {
+    if (unknown) {
       // S12: never force a meaningless re-translation from "I don't know".
       s.currentLevel = 3
       s.answerRevealed = true
@@ -434,8 +461,20 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
       notice = '已进入完整解析；本句不再计为独立测评。'
     } else if (action === 'PASS') {
       s.state = 'PASS'
-      await addFeedback(s, 0, 'pass', `${diagnosis.summary} 本层不展示解析，以保持独立测评条件。`)
-      notice = '核心理解正确，本句判定通过；不展示解析以保持独立测评，可继续做迁移题或结束本轮。'
+      const exposed = s.answerRevealed || s.directAnalysisSeen || s.currentLevel > 0
+      // Feedback level must reflect what the learner actually saw; a green
+      // "Level 0" row next to "答案已暴露" was contradictory (E3).
+      await addFeedback(
+        s,
+        s.currentLevel,
+        'pass',
+        exposed
+          ? `${diagnosis.summary} 核心理解正确；本轮已看过答案，按「提示后」归因，不计独立测评。`
+          : `${diagnosis.summary} 本层不展示解析，以保持独立测评条件。`,
+      )
+      notice = exposed
+        ? '核心理解正确，但本轮已看过答案，不计独立测评；可继续做迁移题或结束本轮。'
+        : '核心理解正确，本句判定通过；不展示解析以保持独立测评，可继续做迁移题或结束本轮。'
     } else if (action === 'CLARIFY') {
       s.state = 'CLARIFY'
       s.clarifyCount += 1
@@ -587,8 +626,10 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
         providerId: provider.id,
         modelId: provider.modelId,
         startedAt: iso(),
-        currentLevel: 0,
-        answerRevealed: false,
+        currentLevel: input.directAnalysisSeen ? 3 : 0,
+        // Prior direct analysis IS answer exposure. Keeping this false made the
+        // UI show a green "L0 独立" badge next to an orange "已看解析" badge.
+        answerRevealed: input.directAnalysisSeen,
         directAnalysisSeen: input.directAnalysisSeen,
         clarifyCount: 0,
         retryCount: 0,
@@ -678,6 +719,13 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
         }
 
         case 'REQUEST_HINT': {
+          // Idempotent guard: once L3 is revealed, a further hint must not
+          // append another full-analysis row (defence even when the intent
+          // whitelist is bypassed, e.g. over IPC).
+          if (s.answerRevealed || s.currentLevel >= 3) {
+            notice = '已展示完整解析（Level 3），没有更深的提示了。'
+            break
+          }
           const next = Math.min(3, s.currentLevel + 1) as 0 | 1 | 2 | 3
           s.currentLevel = next
           if (next >= 3) {
@@ -697,13 +745,27 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
         }
 
         case 'UNLOCK_LEVEL3': {
+          // Idempotent: revealing the answer twice must not append duplicate
+          // L3 rows or rewrite the profile again.
+          if (s.answerRevealed || s.currentLevel >= 3) {
+            notice = '完整解析已展示过，本句不再计为独立正确。'
+            break
+          }
           s.currentLevel = 3
           s.answerRevealed = true
           await addFeedback(s, 3, 'full', level3Content(s, analysis))
-          // Append-only correction row: later exposure supersedes earlier "independent" rows in profile stats.
+          // Append-only correction: getProfile() keeps the LATEST row per
+          // (session,target). Only downgrade rows that were previously counted
+          // as "independent-correct". Rewriting incorrect/insufficient into
+          // assisted-correct would erase real mistakes from the profile.
           const diagnosis = await store.getDiagnosis(s.id)
           const last = attempts[attempts.length - 1]
+          const prior = new Map<string, SkillObservation>()
+          for (const o of await store.listObservations()) {
+            if (o.sessionId === s.id) prior.set(o.targetId, o)
+          }
           for (const t of analysis.targets) {
+            if (prior.get(t.id)?.result !== 'independent-correct') continue
             await store.addObservation({
               id: makeId('obs'),
               targetId: t.id,
@@ -774,14 +836,21 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
             notice = '请先写下对新句的理解。'
             break
           }
-          const result = evaluateTransfer(s.transfer, text)
+          const evaluated = evaluateTransfer(s.transfer, text)
+          // If the learner already saw the answer (L3 / prior analysis), the
+          // transfer cannot be scored as an independent correct result.
+          const exposed = s.answerRevealed || s.currentLevel >= 3 || s.directAnalysisSeen
+          const result = exposed
+            ? { ...evaluated, result: 'unscored' as const, rationale: '本轮已看过解析，迁移表现不计分。' }
+            : evaluated
           s.transferAttempt = { text, submittedAt: iso(), ...result }
-          await store.addReviewTask(makeReviewTask(s.transfer, now()))
+          // A viewed-answer transfer must not create a "correct" review task.
+          if (!exposed) await store.addReviewTask(makeReviewTask(s.transfer, now()))
           await addFeedback(
             s,
-            s.currentLevel,
+            3,
             'full',
-            `即时迁移表现：${result.result}。${result.rationale}\n参考含义：${s.transfer.meaning}\n目标知识点：${s.transfer.keyPoint}\n\n延迟复测已单独排入队列（约 3 天后），与即时表现分开存储。`,
+            `即时迁移表现：${result.result}。${result.rationale}\n参考含义：${s.transfer.meaning}\n目标知识点：${s.transfer.keyPoint}\n\n${exposed ? '本轮已看过解析，未排入延迟复测。' : '延迟复测已单独排入队列（约 3 天后），与即时表现分开存储。'}`,
           )
           s.state = 'COMPLETE'
           s.endedAt = iso()
