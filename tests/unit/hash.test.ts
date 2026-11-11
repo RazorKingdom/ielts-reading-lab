@@ -20,8 +20,10 @@ describe('unit: deterministic hashing', () => {
     expect(h).toMatch(/^[0-9a-f]{16}$/)
     expect(h).toBe(contentHash('same text'))
     expect(h).not.toBe(contentHash('other text'))
-    // Doubled hash: changing only the second seed must change the tail.
-    expect(h.slice(0, 8)).toBe(contentHash('same text').slice(0, 8))
+    // Doubled hash uses two different seeds: the tail must differ from the
+    // head, and must equal fnv1a with the second seed (src/core/hash.ts).
+    expect(h.slice(0, 8)).not.toBe(h.slice(8))
+    expect(h.slice(8)).toBe(fnv1a('same text', 0x9e3779b9).toString(16).padStart(8, '0'))
   })
 
   it('makeId carries the prefix, is unique and non-empty', () => {
