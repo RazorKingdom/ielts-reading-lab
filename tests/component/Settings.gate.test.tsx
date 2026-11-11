@@ -52,10 +52,12 @@ describe('component: Settings API configuration gate', () => {
     apiMock.testApiConnection.mockResolvedValue({ ok: true, message: 'OK' })
   })
 
-  it('renders the single third-party card and a disabled enable button', async () => {
+  it('renders the third-party card with the enable button disabled until ready', async () => {
     renderSettings()
     await waitFor(() => expect(apiMock.getApiConfig).toHaveBeenCalled())
     expect(screen.getAllByText('第三方 API（OpenAI 兼容）').length).toBeGreaterThan(0)
+    // No key, no model, no cost confirmation => enabling must be impossible.
+    expect(screen.getByRole('button', { name: /启用诊断/ })).toBeDisabled()
   })
 
   it('saving trims the URL and model before calling the API', async () => {

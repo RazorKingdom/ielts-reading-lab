@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createBrowserStore, createMemoryStorage } from '../../src/store/browserStore'
 import { createArticle, segmentArticle } from '../../src/core/segment'
-import { makeRuntime } from '../helpers'
+import { makeRuntime, makeSessionInput, D01 } from '../helpers'
 
 const ARTICLE = createArticle({
   id: 'data-test', title: 'Data integrity',
@@ -49,8 +49,15 @@ describe('integration: local store data integrity', () => {
     await api.setApiKey('sk-x')
     await api.setApiConfig({ enabled: true, costConfirmed: true, model: 'm', baseUrl: 'https://x/v1' })
     expect((await api.getApiConfig()).hasKey).toBe(true)
+    // Create a session too, so "clears records" is actually verifiable.
+    const { session } = await api.startSession(makeSessionInput(D01))
+    await api.dispatch(session.id, { type: 'SUBMIT', text: '这取决于员工使用技术有多有效。' })
+    expect((await api.getProfile()).sessions.length).toBeGreaterThan(0)
     await api.deleteAllData()
-    expect(await api.listProviders()).toBeDefined()
+    const profile = await api.getProfile()
+    expect(profile.sessions).toHaveLength(0)
+    expect(profile.observations).toHaveLength(0)
+    expect(profile.marks).toHaveLength(0)
     const cfg = await api.getApiConfig()
     expect(cfg).toMatchObject({ hasKey: false, enabled: false })
   })

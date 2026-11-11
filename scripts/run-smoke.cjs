@@ -6,16 +6,20 @@
 const { spawn } = require('child_process')
 const path = require('path')
 const fs = require('fs')
+const { ensureBuild } = require('./ensure-build.cjs')
 
 const ROOT = path.resolve(__dirname, '..')
 const exe = path.join(ROOT, 'node_modules', 'electron', 'dist', 'electron.exe')
 const entry = path.join(__dirname, 'smoke-electron.cjs')
 const resultFile = path.join(__dirname, 'smoke-result.json')
 
-if (!fs.existsSync(exe) || !fs.existsSync(path.join(ROOT, 'dist', 'index.html'))) {
-  console.error('Build first: npm install && npm run build')
+if (!fs.existsSync(exe)) {
+  console.error('Electron binary missing: npm install first')
   process.exit(2)
 }
+// Rebuild when sources are newer than the bundle, so the 52 checks never run
+// against a stale dist/.
+if (!ensureBuild()) process.exit(2)
 try {
   fs.unlinkSync(resultFile)
 } catch (_) {
