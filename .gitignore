@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build outputs (regenerate with npm run build / npm run package)
+dist/
+dist-electron/
+release/
+release-app/
+
+# Local databases and credentials (never commit)
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+api-credential.bin
+
+# Secrets and local env
+.env
+.env.local
+.env.*.local
+
+# Cached / temporary data
+.tmp/
+.vitest-tmp/
+.smoke-userdata/
+.package-stage/
+.obsolete-asar-hold/
+*.log
+coverage/
+
+# Generated test artifacts
+scripts/smoke-result.json
+
+# WorkBuddy project-local data
+.workbuddy/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

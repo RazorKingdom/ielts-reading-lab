@@ -1,0 +1,31 @@
+import type { LabAPI } from '../src/core/runtime'
+
+/** Whitelist of renderer-callable methods. Anything else is rejected by main. */
+export const LAB_API_METHODS: (keyof LabAPI)[] = [
+  'bootstrap',
+  'listProviders',
+  'createArticle',
+  'deleteArticle',
+  'getArticle',
+  'getReadingPosition',
+  'saveReadingPosition',
+  'getAnalysis',
+  'markAnalysisViewed',
+  'hasAnalysisBeenViewed',
+  'findActiveSession',
+  'startSession',
+  'resumeSession',
+  'dispatch',
+  'getProfile',
+  'addMark',
+  'updateMark',
+  'updateReviewTask',
+  'setSettings',
+  'getApiConfig',
+  'setApiConfig',
+  'setApiKey',
+  'clearApiKey',
+  'testApiConnection',
+  'exportData',
+  'deleteAllData',
+]

@@ -1,0 +1,162 @@
+/* Build a compact, fully offline dictionary from ECDICT (MIT License).
+ *
+ * Source: https://github.com/skywind3000/ECDICT (ecdict.csv, MIT,
+ * Copyright (c) 2025 Linwei). The full CSV is ~66 MB and is NOT committed.
+ * Download it to .tmp/ecdict-source.csv first, then run:
+ *   npm run build:dictionary
+ *
+ * The generated src/data/dictionary.ts contains only the words used by this
+ * app's 100 passages plus IELTS/exam-tagged words, with trimmed Chinese
+ * translations. The upstream LICENSE is copied to third_party/.
+ */
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const SOURCE = path.join(ROOT, '.tmp', 'ecdict-source.csv')
+const BANK = path.join(ROOT, 'src', 'core', 'articleBank.ts')
+const OUT = path.join(ROOT, 'src', 'data', 'dictionary.ts')
+const LICENSE_OUT = path.join(ROOT, 'third_party', 'ECDICT-LICENSE.txt')
+const LICENSE_SOURCE = 'https://raw.githubusercontent.com/skywind3000/ECDICT/master/LICENSE'
+
+if (!fs.existsSync(SOURCE)) {
+  console.error('Missing .tmp/ecdict-source.csv — download ECDICT ecdict.csv first (MIT).')
+  process.exit(2)
+}
+
+const STOPWORDS = new Set(
+  `a an the and or but if while although though because since so as at by for from in into of on onto over to with without about above after again against all am are arent as be been before being below between both can cannot could did do does doing dont down during each few further had has have having he her here hers herself him himself his how i if in is it its itself just me more most my myself no nor not now of off once only other our ours ourselves out over own same she should so some such than that the their theirs them themselves then there these they this those through to too under until up very was we were what when where which who whom why will with would you your yours yourself yourselves also may might must shall one two three many much per via etc eg ie`
+    .split(/\s+/)
+    .filter(Boolean),
+)
+
+const EXAM_TAGS = new Set(['ielts', 'cet4', 'cet6', 'ky', 'toefl', 'gk', 'zk'])
+
+/* ---- words actually used by the app's reading passages ---- */
+const bankSource = fs.readFileSync(BANK, 'utf8')
+const passageTexts = [...bankSource.matchAll(/text: ("(?:[^"\\]|\\.)*")/g)].map((m) => JSON.parse(m[1]))
+const passageWords = new Set()
+for (const text of passageTexts) {
+  for (const match of text.toLowerCase().matchAll(/[\p{L}][\p{L}'’-]*/gu)) {
+    const w = match[0].replace(/^[ '\u2019-]+|[ '\u2019-]+$/g, '')
+    if (w.length > 1 && !STOPWORDS.has(w)) passageWords.add(w)
+  }
+}
+console.log(`Distinct content words in 100 passages: ${passageWords.size}`)
+
+/* ---- streaming CSV parser: never holds the 66 MB file in memory ---- */
+const wanted = new Set(passageWords)
+const picked = new Map()
+let field = ''
+let row = []
+let inQuotes = false
+let lines = 0
+
+function finishRow() {
+  lines++
+  if (row.length < 9) {
+    field = ''
+    row = []
+    return
+  }
+  const word = (row[0] ?? '').trim().toLowerCase()
+  const tag = row[7] ?? ''
+  const inExam = tag.split(/\s+/).some((t) => EXAM_TAGS.has(t))
+  if (!wanted.has(word) && !inExam) {
+    field = ''
+    row = []
+    return
+  }
+
+  const translation = (row[3] ?? '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('[网络]'))
+    .slice(0, 3)
+    .join('\n')
+    .slice(0, 180)
+  if (!translation) {
+    field = ''
+    row = []
+    return
+  }
+
+  const tags = tag.split(/\s+/).filter((t) => EXAM_TAGS.has(t))
+  const collins = Number(row[5] ?? 0)
+  if (collins >= 3) tags.push(`柯林斯${collins}星`)
+  if ((row[6] ?? '').trim() === '1') tags.push('牛津3000')
+
+  const exchange = row[10] ?? ''
+  const lemmaMatch = exchange.match(/(?:^|\/)0:([^/]+)/)
+  const lemma = lemmaMatch ? lemmaMatch[1].trim().toLowerCase() : ''
+
+  picked.set(word, [
+    word,
+    (row[1] ?? '').trim().slice(0, 48),
+    translation,
+    [...new Set(tags)].join(' '),
+    lemma && lemma !== word ? lemma : '',
+  ])
+  field = ''
+  row = []
+}
+
+const raw = fs.readFileSync(SOURCE, 'utf8')
+for (let i = 0; i < raw.length; i++) {
+  const ch = raw[i]
+  if (inQuotes) {
+    if (ch === '"') {
+      if (raw[i + 1] === '"') {
+        field += '"'
+        i++
+      } else inQuotes = false
+    } else field += ch
+    continue
+  }
+  if (ch === '"') inQuotes = true
+  else if (ch === ',') {
+    row.push(field)
+    field = ''
+  } else if (ch === '\n') {
+    row.push(field)
+    finishRow()
+  } else if (ch !== '\r') field += ch
+}
+if (field || row.length) {
+  row.push(field)
+  finishRow()
+}
+console.log(`Parsed ${lines.toLocaleString()} ECDICT rows; kept ${picked.size.toLocaleString()} entries.`)
+
+const rows = [...picked.values()].sort((a, b) => a[0].localeCompare(b[0]))
+const body = rows.map((r) => `  ${JSON.stringify(r)},`).join('\n')
+const out = `/* AUTO-GENERATED by scripts/build-dictionary.mjs — do not edit by hand.
+ * Source: ECDICT by Linwei — https://github.com/skywind3000/ECDICT
+ * License: MIT (Copyright (c) 2025 Linwei); see third_party/ECDICT-LICENSE.txt.
+ * Filtered to words used in this app's passages plus IELTS/exam-tagged words.
+ * No network or AI is used at runtime. */
+export type DictRow = [string, string, string, string, string]
+
+/** [word, phonetic, Chinese translation, tags, lemma] */
+export const DICT_ROWS: DictRow[] = [
+${body}
+]
+
+export const DICTIONARY_SOURCE = 'ECDICT (MIT)'
+`
+fs.mkdirSync(path.dirname(OUT), { recursive: true })
+fs.writeFileSync(OUT, out, 'utf8')
+console.log(`Wrote ${OUT} (${(Buffer.byteLength(out, 'utf8') / 1024).toFixed(0)} KiB)`)
+
+/* Preserve upstream attribution alongside the derived data. */
+try {
+  fs.mkdirSync(path.dirname(LICENSE_OUT), { recursive: true })
+  const res = await fetch(LICENSE_SOURCE)
+  if (res.ok) {
+    fs.writeFileSync(LICENSE_OUT, await res.text(), 'utf8')
+    console.log(`Wrote ${LICENSE_OUT}`)
+  }
+} catch (e) {
+  console.warn('Could not fetch upstream LICENSE; please keep MIT attribution manually.', e)
+}

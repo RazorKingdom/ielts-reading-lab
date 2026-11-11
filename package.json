@@ -1,0 +1,79 @@
+{
+  "name": "ielts-reading-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "IELTS Reading Lab - immersive reading and adaptive diagnostic training desktop app",
+  "main": "dist-electron/electron/main.js",
+  "author": "IELTS Reading Lab",
+  "scripts": {
+    "dev": "vite",
+    "dev:web": "vite --host 127.0.0.1",
+    "build:preload": "esbuild electron/preload.ts --bundle --platform=node --format=cjs --external:electron --target=node20 --outfile=dist-electron/electron/preload.js",
+    "build:electron": "tsc -p tsconfig.electron.json && npm run build:preload",
+    "build": "npm run build:electron && vite build",
+    "start": "npm run build && electron dist-electron/electron/main.js",
+    "dev:electron": "npm run build:electron && concurrently -k \"vite --host 127.0.0.1\" \"cross-env LAB_DEV=1 wait-on http://127.0.0.1:5173 && cross-env LAB_DEV=1 electron dist-electron/electron/main.js\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "node scripts/run-smoke.cjs",
+    "generate:articles": "node scripts/generate-article-bank.mjs",
+    "build:dictionary": "node scripts/build-dictionary.mjs",
+    "dist": "npm run build && electron-builder --win --x64",
+    "dist:dir": "npm run build && electron-builder --win --x64 --dir",
+    "package": "npm run build && node scripts/package-app.cjs"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sql.js": "^1.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.0",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.21.5",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.ieltsreadinglab.app",
+    "productName": "IELTS Reading Lab",
+    "directories": {
+      "output": "release-app",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "node_modules/sql.js/dist/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/sql.js/dist/**/*"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "zip", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "IELTS Reading Lab"
+    },
+    "artifactName": "IELTS-Reading-Lab-${version}-${arch}.${ext}"
+  }
+}
