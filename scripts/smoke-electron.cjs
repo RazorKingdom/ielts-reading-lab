@@ -101,9 +101,9 @@ app.whenReady().then(async () => {
       !rendererJs.includes('kv-key">Predicate'),
   )
   check(
-    '右键语义悬浮窗存在（扇贝式，不标曝光）',
+    '右键语义悬浮窗存在（与 L3 同源，标曝光）',
     rendererJs.includes('句子语义') && rendererJs.includes('st-meaning') &&
-      rendererJs.includes('中键点句展开完整解析与训练'),
+      rendererJs.includes('已标记为看过答案'),
   )
   check(
     '中键三选菜单：直接解析 / 推导训练 / 加入复测',
