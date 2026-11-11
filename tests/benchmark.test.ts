@@ -66,9 +66,16 @@ describe('generic fallback spans never cut a word in half', () => {
 })
 
 describe('diagnosis quality invariants', () => {
-  it('never requires grammar terminology and never scores an unmentioned item as an error', () => {
-    const noTerms = BENCHMARK_CASES.filter((c) => ['D09', 'D10'].includes(c.id))
-    for (const c of noTerms) expect(c.answer).not.toMatch(/从句|定语|主语|谓语/)
+  it('accepts a correct answer that names no grammar terminology', async () => {
+    // Actually run the diagnosis pipeline instead of inspecting the fixture's
+    // strings: the invariant is about the evaluator, not the test data.
+    for (const c of BENCHMARK_CASES.filter((x) => ['D09', 'D10'].includes(x.id))) {
+      expect(c.answer).not.toMatch(/从句|定语|主语|谓语/)
+      const { validation, core, decision } = await run(c.sentence, c.answer, `bench-terms-${c.id}`)
+      expect(validation.valid, validation.issues.join('; ')).toBe(true)
+      expect(core?.status).toBe('correct')
+      expect(decision.action).toBe('PASS')
+    }
   })
 
   it('produces non-empty, verifiable targets for every sample-article sentence', () => {
