@@ -55,7 +55,7 @@ npm start            # 构建并启动桌面应用
 ```bash
 npm run smoke        # Electron + SQLite / 加密凭据端到端自检（52 项）
 npm run dev:web      # 纯浏览器预览（localStorage，不互通，仅看界面）
-npm run package      # 构建并组装免命令行的便携版到 release/IELTS Reading Lab v4/
+npm run package      # 构建并组装免命令行的便携版到 release/IELTS Reading Lab v5/
 ```
 
 `npm run package` 用 `scripts/package-app.cjs` 直接组装（复制 Electron 运行时 + 把应用放在 `resources/app/` 真实目录），不依赖 electron-builder 的临时目录重命名，便于在受限环境打包。`npm run dist` 是 electron-builder 标准路径，普通 Windows 环境可用。
@@ -77,7 +77,7 @@ npm run package      # 构建并组装免命令行的便携版到 release/IELTS 
 
 ### 三键交互：左键取词 / 右键语义 / 中键菜单（完全离线）
 
-阅读工作台的交互是：**左键点击单词 → 本地词典卡片**；**右键点句 → 扇贝式小悬浮窗显示原句与中文语义**（不标记答案已暴露，训练仍算无提示）；**中键点句 → 三选菜单**：直接解析（右栏完整解析，标记答案已暴露）、推导训练（进入引导训练）、加入复测（排入稍后复习）。拖拽划选短语仍可查词，键盘 Enter 等同「直接解析」。解析栏底部也可进入训练或稍后复习。词卡显示音标、中文释义、雅思/四六级/考研/牛津 3000/柯林斯星级等标签；不规则词形还原到原形；未收录词如实提示并给出相近词。按 Esc 或点击空白区域关闭。
+阅读工作台的交互是：**左键点击单词 → 本地词典卡片**；**右键点句 → 扇贝式小悬浮窗显示原句与中文语义**（与 L3 参考理解同源，会标记"答案已暴露"）；**中键点句 → 三选菜单**：直接解析（右栏完整解析，标记答案已暴露）、推导训练（进入引导训练）、加入复测（排入稍后复习）。拖拽划选短语仍可查词，键盘 Enter 等同「直接解析」。解析栏底部也可进入训练或稍后复习。词卡显示音标、中文释义、雅思/四六级/考研/牛津 3000/柯林斯星级等标签；不规则词形还原到原形；未收录词如实提示并给出相近词。按 Esc 或点击空白区域关闭。
 
 词库来自 **ECDICT**（MIT，Copyright (c) 2025 Linwei），由 `scripts/build-dictionary.mjs` 从官方 66 MB 全量 CSV 过滤生成：本项目 100 篇文章的全部实词 + IELTS/考试标签词，共 **11,828 条、约 1.3 MB**。许可全文见 `third_party/ECDICT-LICENSE.txt`。运行时零网络、零 AI、零费用。离线包不含 66 MB 源文件；如需重新生成，自行下载 `ecdict.csv` 到 `.tmp/` 后运行 `npm run build:dictionary`。
 
