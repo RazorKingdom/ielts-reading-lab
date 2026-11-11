@@ -95,11 +95,11 @@ npm run test:all    # 上面两条连跑
 
 ## 5. 当前覆盖统计（2026-11-11）
 
-- Vitest 总计：**190 项**（根目录历史测试 89 + unit 45 + integration 16 + component 19 + regression 21）
+- Vitest 总计：**202 项**（根目录历史测试 89 + unit 45 + integration 16 + component 25 + regression 27）
   - 注：根目录 89 项里有 20 项由 `benchmark.test.ts` 顶层循环动态生成，静态数 `it(` 会少算。用 `vitest --reporter=json` 统计才准确。
-- Electron smoke：**52 项**
-- 真实鼠标输入验证：`npm run verify:middleclick`（见 §7），已纳入 `npm run test:all`
-- `npm run test:all` = vitest → smoke → 真机中键验证；三个入口都经过 `scripts/ensure-build.cjs` 的**产物新鲜度检查**（源码比 dist 新则自动重建），避免测到旧 bundle。
+- Electron smoke：**54 项**（含错词本导航/双列/词义文案与 API 白名单哨兵）
+- 真实输入验证：`npm run verify:middleclick`、`npm run verify:wrongwords`（见 §7），均已纳入 `npm run test:all`
+- `npm run test:all` = vitest → smoke → 真机中键验证 → 真机错词本验证；三个入口都经过 `scripts/ensure-build.cjs` 的**产物新鲜度检查**（源码比 dist 新则自动重建），避免测到旧 bundle。
 - 均未使用覆盖率工具；缺口由上文"四层总览"与代码评审确定。
 
 ## 7. 真实输入验证：不要只信 jsdom 的合成事件（重要教训）
@@ -123,6 +123,18 @@ npm run verify:middleclick
 **验证工具自身也会假阳性（第二次教训）**：第一版脚本用 `querySelector('.sentence-menu')` 判定，而左键词卡与中键菜单共用这个 class；脚本又先派发了左键，中键完全失效时残留词卡仍会让 `menu:true`。现已改为：中键前用 Escape 清空 DOM 并断言 `.sentence-menu` 数量为 0；只认 `.sentence-action-menu`；检查菜单文本含三项与 `events` 含 `mousedown|1`；launcher 每次删除旧结果文件，条件不全即非零退出。
 
 **因此新增强制要求：任何回归验证脚本上线前，必须做一次反向验证**——故意破坏被测逻辑，确认脚本 FAIL，再恢复确认 PASS。本次已对中键验证执行过（破坏后 `menu:false` → FAILED）。每次改 Reader 交互后应跑此脚本，再跑 smoke。
+
+### 错词本端到端验证
+
+```
+npm run verify:wrongwords
+# 真实左键点击句子 → 词卡出现「添加错词本」→ 点击按钮 → 经 preload 白名单
+# IPC 落到真实 SQLite → 切到侧边栏「错词本」→ 检查双竖排两列 → 点击单词
+# → 检查 .ww-meaning 真的显示释义。每次运行先清空独立 userData 目录，
+# 避免上次的记录造成假阳性；同时断言点击前没有 .ww-meaning。
+```
+
+已做反向验证：把按钮 `onClick` 改成空函数后，`STORED []` → FAILED；恢复后 PASS。组件测试（`tests/component/WrongWords.test.tsx`）与真实 runtime 回归（`tests/regression/wrong-words.test.ts`）分别覆盖双列渲染/点击词义/移除/筛选，以及词形归并去重、重启持久化、删除、清空与导出。
 
 ## 6. 已知不测的内容（诚实边界）
 

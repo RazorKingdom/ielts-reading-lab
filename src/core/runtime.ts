@@ -19,6 +19,7 @@ import type {
   TrainingIntent,
   TrainingSession,
   SentenceAnalysis,
+  WrongWord,
 } from './types'
 import { POLICY_VERSION } from './types'
 import { makeId } from './hash'
@@ -32,6 +33,7 @@ import { validateDiagnosis } from './validator'
 import { canSubmit, decide, isUnknownAnswer, observationResult, POLICY_LIMITS } from './machine'
 import type { Decision } from './machine'
 import { buildTransferExercise, evaluateTransfer, makeReviewTask } from './exercise'
+import { lookupWord } from './dictionary'
 
 /* ----------------------------- storage port ----------------------------- */
 
@@ -71,6 +73,10 @@ export interface LabStore {
   listMarks(): Promise<MarkedSentence[]>
   addMark(m: MarkedSentence): Promise<void>
   updateMark(id: string, patch: Partial<MarkedSentence>): Promise<void>
+
+  listWrongWords(): Promise<WrongWord[]>
+  addWrongWord(w: WrongWord): Promise<void>
+  removeWrongWord(id: string): Promise<void>
 
   getExposures(): Promise<string[]>
   addExposure(key: string): Promise<void>
@@ -133,6 +139,15 @@ export interface LabAPI {
   addMark(input: { articleId: string; sentenceId: string; sentenceText: string; note: string }): Promise<void>
   updateMark(id: string, status: MarkedSentence['status']): Promise<void>
   updateReviewTask(id: string, status: ReviewTask['status']): Promise<void>
+
+  /** Wrong-word notebook (offline dictionary snapshots, no AI involved). */
+  listWrongWords(): Promise<WrongWord[]>
+  addWrongWord(input: {
+    query: string
+    sentenceText?: string
+    articleId?: string
+  }): Promise<{ added: boolean; word: WrongWord | null }>
+  removeWrongWord(id: string): Promise<void>
 
   setSettings(patch: Partial<AppSettings>): Promise<AppSettings>
   getApiConfig(): Promise<ThirdPartyConfig>
@@ -922,6 +937,44 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
 
     async updateReviewTask(id, status) {
       await store.updateReviewTask(id, { status })
+    },
+
+    /** The notebook stores a snapshot so a meaning is always available offline. */
+    async listWrongWords() {
+      const list = await store.listWrongWords()
+      return list.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id))
+    },
+
+    async addWrongWord(input) {
+      const query = input.query.trim().slice(0, 80)
+      if (!query) return { added: false, word: null }
+      const result = lookupWord(query)
+      // Inflected forms deduplicate onto their lemma: "ran" and "run" are one entry.
+      const lemma = (result.entry?.word ?? query).trim()
+      const key = lemma.toLowerCase()
+      const existing = (await store.listWrongWords()).find((w) => w.word.toLowerCase() === key)
+      if (existing) return { added: false, word: existing }
+
+      const word: WrongWord = {
+        id: makeId('ww'),
+        word: lemma,
+        query,
+        translation: result.entry?.translation ?? result.note ?? '离线词库未收录该词。',
+        tags: result.entry?.tags ?? [],
+        found: result.found,
+        createdAt: iso(),
+        ...(result.entry?.phonetic ? { phonetic: result.entry.phonetic } : {}),
+        ...(result.entry?.base ? { base: result.entry.base } : {}),
+        ...(result.note ? { note: result.note } : {}),
+        ...(input.sentenceText ? { sentenceText: input.sentenceText.slice(0, 300) } : {}),
+        ...(input.articleId ? { articleId: input.articleId } : {}),
+      }
+      await store.addWrongWord(word)
+      return { added: true, word }
+    },
+
+    async removeWrongWord(id) {
+      await store.removeWrongWord(id)
     },
 
     async setSettings(patch) {

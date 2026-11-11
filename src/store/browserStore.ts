@@ -11,6 +11,7 @@ import type {
   TeachingDecision,
   ThirdPartyConfig,
   TrainingSession,
+  WrongWord,
 } from '../core/types'
 import type { LabStore } from '../core/runtime'
 import { DEFAULT_API_CONFIG, DEFAULT_SETTINGS } from '../core/runtime'
@@ -28,6 +29,7 @@ interface DbShape {
   observations: SkillObservation[]
   reviewTasks: ReviewTask[]
   marks: MarkedSentence[]
+  wrongWords: WrongWord[]
   exposures: string[]
   settings: AppSettings
   /** Non-secret API settings only. The key is NEVER written to this object. */
@@ -46,6 +48,7 @@ function emptyDb(): DbShape {
     observations: [],
     reviewTasks: [],
     marks: [],
+    wrongWords: [],
     exposures: [],
     settings: { ...DEFAULT_SETTINGS },
     apiConfig: { ...DEFAULT_API_CONFIG },
@@ -220,6 +223,18 @@ export function createBrowserStore(storage?: KeyValueStorage): LabStore {
       await mutate((db) => {
         const m = db.marks.find((x) => x.id === id)
         if (m) Object.assign(m, clone(patch))
+      })
+    },
+
+    async listWrongWords() {
+      return clone(read().wrongWords)
+    },
+    async addWrongWord(w) {
+      await mutate((db) => void db.wrongWords.push(clone(w)))
+    },
+    async removeWrongWord(id) {
+      await mutate((db) => {
+        db.wrongWords = db.wrongWords.filter((x) => x.id !== id)
       })
     },
 

@@ -20,6 +20,7 @@
 
 - Windows Electron + React + TypeScript，本地 SQLite。
 - 阅读与训练双核心；左键取词、右键看语义悬浮窗、中键弹三选菜单（直接解析/推导训练/加入复测）。
+- 错词本：左键词卡点「添加错词本」收录，侧边栏以双竖排列表展示，点击单词显示词义；词形自动归并，完全离线。
 - 轻量 AI 侧栏 + 同窗口专注模式。
 - 自由中文表达式阅读诊断；无须填写语法术语。
 - 渐进式反馈 L0–L3；重要局部错误智能触发二次作答。
@@ -55,7 +56,7 @@ npm start            # 构建并启动桌面应用
 ```bash
 npm run smoke        # Electron + SQLite / 加密凭据端到端自检（52 项）
 npm run dev:web      # 纯浏览器预览（localStorage，不互通，仅看界面）
-npm run package      # 构建并组装免命令行的便携版到 release/IELTS Reading Lab v7/
+npm run package      # 构建并组装免命令行的便携版到 release/IELTS Reading Lab v8/
 ```
 
 `npm run package` 用 `scripts/package-app.cjs` 直接组装（复制 Electron 运行时 + 把应用放在 `resources/app/` 真实目录），不依赖 electron-builder 的临时目录重命名，便于在受限环境打包。`npm run dist` 是 electron-builder 标准路径，普通 Windows 环境可用。

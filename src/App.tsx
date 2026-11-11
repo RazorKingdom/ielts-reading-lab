@@ -9,8 +9,9 @@ import type { TrainingRequest } from './ui/Reader'
 import Focus from './ui/Focus'
 import ProfileView from './ui/Profile'
 import SettingsView from './ui/Settings'
+import WrongWordsView from './ui/WrongWords'
 
-type View = 'library' | 'reader' | 'focus' | 'profile' | 'settings'
+type View = 'library' | 'reader' | 'focus' | 'profile' | 'wrongwords' | 'settings'
 
 interface HostInfo {
   kind: 'electron'
@@ -25,6 +26,7 @@ const NAV: { key: View; label: string; icon: string }[] = [
   { key: 'library', label: '文章库', icon: 'library' },
   { key: 'reader', label: '阅读工作台', icon: 'reader' },
   { key: 'focus', label: '训练中心', icon: 'focus' },
+  { key: 'wrongwords', label: '错词本', icon: 'book' },
   { key: 'profile', label: '学习档案', icon: 'profile' },
 ]
 
@@ -33,6 +35,7 @@ const TITLES: Record<View, { title: string; sub: string }> = {
   reader: { title: '阅读工作台', sub: '' },
   focus: { title: '训练中心', sub: '' },
   profile: { title: '学习档案', sub: '定性表现与证据追溯' },
+  wrongwords: { title: '错词本', sub: '左键取词收录 · 离线词义' },
   settings: { title: '设置', sub: '模型连接 / 隐私 / 排版 / 数据' },
 }
 
@@ -221,7 +224,7 @@ export default function App() {
       </nav>
 
       <div className="main-area">
-        {(view === 'library' || view === 'profile' || view === 'settings') && (
+        {(view === 'library' || view === 'profile' || view === 'wrongwords' || view === 'settings') && (
           <div className="topbar">
             <h1>{title.title}</h1>
             <span className="sub">{title.sub}</span>
@@ -267,6 +270,10 @@ export default function App() {
 
         {view === 'profile' && (
           <ProfileView profile={profile} onDataChanged={() => void refresh()} onToast={setToast} />
+        )}
+
+        {view === 'wrongwords' && (
+          <WrongWordsView onDataChanged={() => void refresh()} onToast={setToast} />
         )}
 
         {view === 'settings' && (

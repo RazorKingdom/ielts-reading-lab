@@ -14,6 +14,7 @@ import type {
   TeachingDecision,
   ThirdPartyConfig,
   TrainingSession,
+  WrongWord,
 } from '../src/core/types'
 import type { LabStore } from '../src/core/runtime'
 import { DEFAULT_API_CONFIG, DEFAULT_SETTINGS } from '../src/core/runtime'
@@ -208,6 +209,16 @@ class SqliteStore implements LabStore {
   async updateMark(id: string, patch: Partial<MarkedSentence>): Promise<void> {
     const m = one<MarkedSentence>('mark', id)
     if (m) put('mark', id, { ...m, ...patch }, true)
+  }
+
+  async listWrongWords(): Promise<WrongWord[]> {
+    return all<WrongWord>('wrongWord')
+  }
+  async addWrongWord(w: WrongWord): Promise<void> {
+    put('wrongWord', w.id, w)
+  }
+  async removeWrongWord(id: string): Promise<void> {
+    remove('wrongWord', id)
   }
 
   async getExposures(): Promise<string[]> {

@@ -24,7 +24,7 @@ interface Props {
   onToast: (msg: string) => void
 }
 
-interface WordToolState { x: number; y: number; text: string }
+interface WordToolState { x: number; y: number; text: string; sentenceText?: string }
 /** Right-click: compact popover showing only the sentence's Chinese meaning. */
 interface SentenceToolState { x: number; y: number; sentenceId: string; sentenceText: string; meaning: string; loading: boolean }
 /** Middle-click: the original three-choice menu. */
@@ -37,6 +37,9 @@ export default function Reader({
   const sentences = useMemo(() => allSentences(paragraphs), [paragraphs])
 
   const [wordTool, setWordTool] = useState<WordToolState | null>(null)
+  // Lowercased lemmas already in the notebook, used only to label the button.
+  const [wrongWordKeys, setWrongWordKeys] = useState<Set<string>>(new Set())
+  const [addingWord, setAddingWord] = useState(false)
   const [sentenceTool, setSentenceTool] = useState<SentenceToolState | null>(null)
   const [sentenceMenu, setSentenceMenu] = useState<SentenceMenuState | null>(null)
   const [activeSentenceId, setActiveSentenceId] = useState<string | null>(null)
@@ -63,6 +66,12 @@ export default function Reader({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  useEffect(() => {
+    void api.listWrongWords()
+      .then((list) => setWrongWordKeys(new Set(list.map((w) => w.word.toLowerCase()))))
+      .catch(() => undefined) // notebook state is cosmetic; never block reading
   }, [])
 
   const markedIds = useMemo(() => new Set(marks.filter((m) => m.status === 'pending').map((m) => m.sentenceId)), [marks])
@@ -187,6 +196,13 @@ export default function Reader({
     return extractWordAt(node.textContent ?? '', offset)
   }
 
+  /** The sentence containing a DOM node, saved as wrong-word context. */
+  function sourceSentenceText(node: Node | null): string | undefined {
+    if (!node) return undefined
+    const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement)
+    return el?.closest('[data-sid]')?.textContent?.trim() || undefined
+  }
+
   /** Selection still works as an optional convenience, left button only. */
   function handleSelectionEnd(e: ReactMouseEvent<HTMLDivElement>) {
     if (e.button !== 0) return
@@ -204,6 +220,7 @@ export default function Reader({
       x: Math.max(8, Math.min(e.clientX, window.innerWidth - 320)),
       y: Math.max(8, Math.min(rect.bottom + 10, window.innerHeight - 310)),
       text: text.slice(0, 80),
+      sentenceText: sourceSentenceText(range.commonAncestorContainer),
     })
   }
 
@@ -242,6 +259,7 @@ export default function Reader({
       x: Math.max(8, Math.min(e.clientX, window.innerWidth - 320)),
       y: Math.max(8, Math.min(e.clientY + 12, window.innerHeight - 310)),
       text: word.slice(0, 80),
+      sentenceText: sourceSentenceText(e.target as Node),
     })
   }
 
@@ -315,6 +333,30 @@ export default function Reader({
       y: Math.max(8, Math.min(e.clientY + 10, window.innerHeight - 210)),
       sentence: s,
     })
+  }
+
+  /** Add the word shown in the left-click card to the wrong-word notebook. */
+  async function addToNotebook(query: string) {
+    if (addingWord) return
+    setAddingWord(true)
+    try {
+      const res = await api.addWrongWord({
+        query,
+        sentenceText: wordTool?.sentenceText,
+        articleId: article.id,
+      })
+      if (!res.word) {
+        onToast('请先在原文中点选一个单词。')
+        return
+      }
+      setWrongWordKeys((prev) => new Set(prev).add(res.word!.word.toLowerCase()))
+      onToast(res.added ? `已加入错词本：${res.word.word}` : `「${res.word.word}」已在错词本中`)
+      onDataChanged()
+    } catch (e) {
+      onToast(`加入错词本失败：${e instanceof Error ? e.message : '未知错误'}`)
+    } finally {
+      setAddingWord(false)
+    }
   }
 
   /** Keyboard (Enter/Space) opens full analysis. Because that records answer
@@ -532,6 +574,8 @@ export default function Reader({
 
       {wordTool && (() => {
         const result = lookupWord(wordTool.text)
+        const wordKey = (result.entry?.word ?? result.query).trim().toLowerCase()
+        const alreadyAdded = wrongWordKeys.has(wordKey)
         return (
           <div className="sentence-menu word-tool" style={{ left: wordTool.x, top: wordTool.y, width: 310 }}>
             <div className="menu-head">离线词典 · 左键取词</div>
@@ -572,6 +616,17 @@ export default function Reader({
               {result.note && !result.entry?.base && result.found && (
                 <div className="hint" style={{ marginTop: 8 }}>{result.note}</div>
               )}
+              <div className="word-tool-actions">
+                <button
+                  className="btn sm primary"
+                  disabled={addingWord || alreadyAdded}
+                  onClick={() => void addToNotebook(result.query)}
+                >
+                  <Icon name={alreadyAdded ? 'check' : 'plus'} size={12} />
+                  {alreadyAdded ? '已在错词本' : '添加错词本'}
+                </button>
+                {!result.found && <span className="hint">未收录也可收录</span>}
+              </div>
             </div>
           </div>
         )

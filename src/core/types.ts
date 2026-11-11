@@ -303,6 +303,31 @@ export interface MarkedSentence {
   status: 'pending' | 'done'
 }
 
+/**
+ * A word the reader flagged from the left-click dictionary card.
+ * The lookup snapshot is stored with it so the notebook still shows a meaning
+ * offline and stays reproducible even if the bundled dictionary changes.
+ */
+export interface WrongWord {
+  id: string
+  /** Normalised lemma (lowercased) used for deduplication and display. */
+  word: string
+  /** The exact surface text the reader clicked or selected. */
+  query: string
+  phonetic?: string
+  translation: string
+  tags: string[]
+  /** Lemma when the query was an inflected form. */
+  base?: string
+  /** False when the offline dictionary had no entry for this word. */
+  found: boolean
+  note?: string
+  /** Sentence the word was picked from, shown as context in the notebook. */
+  sentenceText?: string
+  articleId?: string
+  createdAt: string
+}
+
 export interface ProfileStats {
   totalSessions: number
   independentCorrect: number

@@ -124,6 +124,16 @@ app.whenReady().then(async () => {
       !rendererJs.includes('右键单击句子打开解析'),
   )
 
+  check(
+    '错词本导航 / 双列列表 / 点击显示词义已打包',
+    rendererJs.includes('错词本') && rendererJs.includes('添加错词本') &&
+      rendererJs.includes('ww-columns') && rendererJs.includes('ww-meaning'),
+  )
+  check(
+    '错词本方法在渲染进程可调用白名单内',
+    ['listWrongWords', 'addWrongWord', 'removeWrongWord'].every((m) => LAB_API_METHODS.includes(m)),
+  )
+
   check('离线词库随应用打包', dictionarySize() > 10000, `${dictionarySize()} 条`)
   const dictHit = lookupWord('technology')
   check('离线查词无需网络即可命中', dictHit.found && /技术|工艺/.test(dictHit.entry?.translation ?? ''), dictHit.entry?.word)

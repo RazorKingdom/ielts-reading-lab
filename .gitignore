@@ -31,7 +31,10 @@ coverage/
 # Generated test artifacts
 scripts/smoke-result.json
 scripts/verify-middleclick-result.json
+scripts/verify-wrongwords-result.json
 .probe-userdata/
+.verify-ww-userdata/
+.smoke-userdata/
 
 # WorkBuddy project-local data
 .workbuddy/

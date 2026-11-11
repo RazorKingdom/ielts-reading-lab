@@ -14,6 +14,8 @@ const apiMock = vi.hoisted(() => ({
   addMark: vi.fn(),
   getReadingPosition: vi.fn(),
   saveReadingPosition: vi.fn(),
+  listWrongWords: vi.fn().mockResolvedValue([]),
+  addWrongWord: vi.fn(),
 }))
 
 vi.mock('../../src/backend', () => ({ api: apiMock }))
@@ -260,5 +262,36 @@ describe('component: Reader three-button interactions', () => {
     mouse(sentenceEl(), 'click', 0)
     expect(screen.queryByText('句子语义')).not.toBeInTheDocument()
     expect(screen.queryByText('句子操作')).not.toBeInTheDocument()
+  })
+
+  it('the word card button adds the picked word to the notebook with its source sentence', async () => {
+    const p = props()
+    apiMock.addWrongWord.mockResolvedValue({
+      added: true,
+      word: { id: 'ww-1', word: 'the', query: 'The', translation: 'art. 那', tags: [], found: true, createdAt: '2026-01-01T00:00:00.000Z' },
+    })
+    render(<Reader {...p} />)
+    const textNode = sentenceEl().firstChild!;
+    (document as unknown as { caretRangeFromPoint: () => Range }).caretRangeFromPoint = () => {
+      const r = document.createRange()
+      r.setStart(textNode, 0)
+      r.setEnd(textNode, 0)
+      return r
+    }
+    mouse(sentenceEl(), 'click', 0)
+    expect(document.querySelector('.word-tool')).not.toBeNull()
+
+    const button = screen.getByRole('button', { name: /添加错词本/ })
+    await act(async () => { button.click() })
+    await waitFor(() => expect(apiMock.addWrongWord).toHaveBeenCalledTimes(1))
+    expect(apiMock.addWrongWord).toHaveBeenCalledWith({
+      query: 'The',
+      sentenceText: SENTENCE,
+      articleId: 'a1',
+    })
+    expect(p.onToast).toHaveBeenCalledWith(expect.stringContaining('已加入错词本'))
+    expect(p.onDataChanged).toHaveBeenCalled()
+    // The button now reflects that the lemma is already collected.
+    expect(screen.getByRole('button', { name: /已在错词本/ })).toBeDisabled()
   })
 })
