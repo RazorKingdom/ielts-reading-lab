@@ -93,9 +93,27 @@ npm run test:all    # 上面两条连跑
 
 ## 5. 当前覆盖统计（2026-11-11）
 
-- Vitest 总计：**169 项**（根目录历史测试 89 + unit 45 + integration 15 + component 12 + regression 8）
+- Vitest 总计：**179 项**（根目录历史测试 89 + unit 45 + integration 16 + component 15 + regression 14）
 - Electron smoke：**52 项**
+- 真实鼠标输入验证：`npm run verify:middleclick`（见 §7）
 - 均未使用覆盖率工具；缺口由上文"四层总览"与代码评审确定。
+
+## 7. 真实输入验证：不要只信 jsdom 的合成事件（重要教训）
+
+`tests/component/Reader.interactions.test.tsx` 曾在 jsdom 里派发 `auxclick` 断言"中键菜单弹出"，全部通过——但**真实 Electron 里中键点击根本弹不出菜单**。原因是 jsdom 的 `dispatchEvent` 直接调用了 DOM 监听器，绕过了 Chromium 对中键的真实处理路径；组件测试因此产生了假阳性。
+
+**结论：涉及鼠标按键（尤其非左键）、拖选、滚轮等浏览器原生行为的交互，jsdom 合成事件不足以证明真实可用。**
+
+为此增加了真实输入验证：
+
+```bash
+npm run verify:middleclick
+# 用 Electron 的 webContents.sendInputEvent 在真实渲染进程里派发 middle
+# mousedown/mouseup，检查 .sentence-menu 是否出现。结果写入
+# scripts/verify-middleclick-result.json，menu:true 才算通过。
+```
+
+它发现了真实 bug：中键菜单原来绑在 `onAuxClick`，而真实中键在下层被 autoscroll 处理，`auxclick` 不稳定触发。现已改为 `onMouseDown` 监听 `e.button === 1` 并 `preventDefault()` 阻止自动滚动。每次改 Reader 交互后应跑此脚本，再跑 smoke。
 
 ## 6. 已知不测的内容（诚实边界）
 

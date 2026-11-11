@@ -106,9 +106,9 @@ app.whenReady().then(async () => {
       rendererJs.includes('已标记为看过答案'),
   )
   check(
-    '中键三选菜单：直接解析 / 推导训练 / 加入复测',
+    '中键三选菜单：直接解析 / 推导训练 / 加入复测（走 mousedown）',
     rendererJs.includes('直接解析') && rendererJs.includes('推导训练') && rendererJs.includes('加入复测') &&
-      rendererJs.includes('onAuxClick'),
+      rendererJs.includes('onMouseDown') && !rendererJs.includes('onAuxClick'),
   )
   check(
     '稍后复习按钮已移入解析栏底部',

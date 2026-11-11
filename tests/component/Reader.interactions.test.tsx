@@ -102,10 +102,10 @@ describe('component: Reader three-button interactions', () => {
   it('middle-click opens the three-choice menu; middle button on the sentence only', () => {
     render(<Reader {...props()} />)
     const el = sentenceEl()
-    mouse(el, 'auxclick', 0) // wrong button
+    mouse(el, 'mousedown', 0) // wrong button
     expect(screen.queryByText('句子操作')).not.toBeInTheDocument()
 
-    mouse(el, 'auxclick', 1)
+    mouse(el, 'mousedown', 1)
     expect(screen.getByText('句子操作')).toBeInTheDocument()
     expect(screen.getByText('直接解析')).toBeInTheDocument()
     expect(screen.getByText('推导训练')).toBeInTheDocument()
@@ -114,7 +114,7 @@ describe('component: Reader three-button interactions', () => {
 
   it('middle-menu "直接解析" opens the sidebar and marks analysis viewed', async () => {
     render(<Reader {...props()} />)
-    mouse(sentenceEl(), 'auxclick', 1)
+    mouse(sentenceEl(), 'mousedown', 1)
     act(() => { screen.getByText('直接解析').click() })
     await waitFor(() => expect(apiMock.markAnalysisViewed).toHaveBeenCalledTimes(1))
     expect(screen.getByText('结构 / Structure')).toBeInTheDocument()
@@ -124,7 +124,7 @@ describe('component: Reader three-button interactions', () => {
   it('middle-menu "推导训练" starts training with directAnalysisSeen=false', async () => {
     const p = props()
     render(<Reader {...p} />)
-    mouse(sentenceEl(), 'auxclick', 1)
+    mouse(sentenceEl(), 'mousedown', 1)
     act(() => { screen.getByText('推导训练').click() })
     await waitFor(() => expect(p.onStartTraining).toHaveBeenCalledTimes(1))
     expect(p.onStartTraining.mock.calls[0][0].directAnalysisSeen).toBe(false)
@@ -134,7 +134,7 @@ describe('component: Reader three-button interactions', () => {
   it('middle-menu "加入复测" adds a mark, refreshes data and toasts', async () => {
     const p = props()
     render(<Reader {...p} />)
-    mouse(sentenceEl(), 'auxclick', 1)
+    mouse(sentenceEl(), 'mousedown', 1)
     act(() => { screen.getByText('加入复测').click() })
     await waitFor(() => expect(apiMock.addMark).toHaveBeenCalledTimes(1))
     expect(p.onDataChanged).toHaveBeenCalledTimes(1)
@@ -149,7 +149,7 @@ describe('component: Reader three-button interactions', () => {
     act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
     expect(screen.queryByText('句子语义')).not.toBeInTheDocument()
 
-    mouse(el, 'auxclick', 1)
+    mouse(el, 'mousedown', 1)
     expect(screen.getByText('句子操作')).toBeInTheDocument()
     act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
     expect(screen.queryByText('句子操作')).not.toBeInTheDocument()

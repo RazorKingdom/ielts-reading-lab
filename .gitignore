@@ -30,6 +30,8 @@ coverage/
 
 # Generated test artifacts
 scripts/smoke-result.json
+scripts/verify-middleclick-result.json
+.probe-userdata/
 
 # WorkBuddy project-local data
 .workbuddy/

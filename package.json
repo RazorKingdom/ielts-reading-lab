@@ -26,7 +26,8 @@
     "test:integration": "vitest run tests/integration",
     "test:component": "vitest run tests/component",
     "test:regression": "vitest run tests/regression",
-    "test:all": "vitest run && npm run smoke"
+    "test:all": "vitest run && npm run smoke",
+    "verify:middleclick": "node scripts/run-verify-middleclick.cjs"
   },
   "dependencies": {
     "react": "^18.3.1",

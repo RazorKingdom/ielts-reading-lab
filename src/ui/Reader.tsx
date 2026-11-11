@@ -115,6 +115,9 @@ export default function Reader({
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
+      // A middle press opens the action menu on the sentence (onMouseDown).
+      // Don't let this global dismisser close the menu it just opened.
+      if (e.button === 1) return
       const target = e.target as HTMLElement
       if (!target.closest('.word-tool')) setWordTool(null)
       if (!target.closest('.sentence-tool')) setSentenceTool(null)
@@ -122,8 +125,7 @@ export default function Reader({
     }
     document.addEventListener('mousedown', onDocClick)
     // Middle-click auto-scroll is prevented only on sentences (see
-    // onSentenceAuxClick). Other areas, including the analysis sidebar, keep
-    // the browser's normal middle-click scrolling.
+    // onSentenceMouseDown). Other areas keep native middle-click scrolling.
     return () => document.removeEventListener('mousedown', onDocClick)
   }, [])
 
@@ -296,10 +298,14 @@ export default function Reader({
     })
   }
 
-  /** Middle button = the original three-choice action menu. */
-  function onSentenceAuxClick(e: ReactMouseEvent, s: Sentence) {
+  /** Middle button = the original three-choice action menu.
+   * IMPORTANT: handle mousedown, not auxclick. In the packaged Electron app a
+   * middle press only delivers mousedown/mouseup to the element; Chromium's
+   * autoscroll consumes the synthetic auxclick, so an onAuxClick handler never
+   * fires for real users (verified with a real sendInputEvent middle click). */
+  function onSentenceMouseDown(e: ReactMouseEvent, s: Sentence) {
     if (e.button !== 1) return
-    e.preventDefault()
+    e.preventDefault() // stop Chromium middle-click autoscroll
     e.stopPropagation()
     window.getSelection()?.removeAllRanges()
     setWordTool(null)
@@ -408,7 +414,7 @@ export default function Reader({
                       ].filter(Boolean).join(' ')}
                       onClick={(e) => onSentenceClick(e)}
                       onContextMenu={(e) => onSentenceContextMenu(e, s)}
-                      onAuxClick={(e) => onSentenceAuxClick(e, s)}
+                      onMouseDown={(e) => onSentenceMouseDown(e, s)}
                       onKeyDown={(e) => onSentenceKey(e, s)}
                     >
                       {s.text}{' '}
