@@ -107,4 +107,13 @@ describe('integration: API configuration gate', () => {
     expect(cfg.enabled).toBe(false)
     expect(cfg.hasKey).toBe(false)
   })
+
+  it('testApiConnection refuses to send a request without cost confirmation', async () => {
+    const { api } = makeRuntime()
+    await api.setApiKey('sk-test')
+    await api.setApiConfig({ model: 'm', baseUrl: 'https://example.com/v1', costConfirmed: false })
+    const r = await api.testApiConnection()
+    expect(r.ok).toBe(false)
+    expect(r.message).toContain('费用确认')
+  })
 })

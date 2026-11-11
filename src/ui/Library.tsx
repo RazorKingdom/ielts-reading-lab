@@ -51,7 +51,7 @@ export default function Library({ articles, onOpen, onCreate, onDelete, onToast 
         <div className="page-head">
           <div>
             <h2>文章库</h2>
-            <p>内置 100 篇原创 IELTS 风格练习文本，也可粘贴自己的纯文本。阅读时左键点词查词，右键点句打开训练菜单。</p>
+            <p>内置 100 篇原创 IELTS 风格练习文本，也可粘贴自己的纯文本。阅读时左键点词查词，右键点句看语义，中键点句打开操作菜单。</p>
           </div>
           <div className="right">
             <Badge tone="blue">
@@ -146,7 +146,7 @@ export default function Library({ articles, onOpen, onCreate, onDelete, onToast 
               <div className="section-title">今日建议路径</div>
               <div className="small muted" style={{ lineHeight: 1.9 }}>
                 1. 从内置 100 篇中选一篇（建议先试前 3 篇）<br />
-                2. 右键单击一个长句打开解析，点解析栏底部「进入引导训练」<br />
+                2. 中键单击一个长句，选「直接解析」或「推导训练」<br />
                 3. 用中文自由写出你的理解<br />
                 4. 观察 Level 1 反馈如何不剧透<br />
                 5. 需要时再解锁完整解析或迁移题

@@ -180,6 +180,8 @@ export interface TeachingDecision {
   sessionId: string
   action: TeachingAction
   reasonCodes: string[]
+  /** Persisted policy-veto explanation so it survives resume/restart. */
+  policyNote?: string
   evidenceIds: string[]
   policyVersion: string
   createdAt: string
@@ -229,6 +231,8 @@ export interface TrainingSession {
   }
   transferAttempt?: TransferResult
   lastError?: string
+  /** Human-readable, actionable guidance for lastError; survives resume. */
+  lastErrorNote?: string
 }
 
 export type TrainingIntent =

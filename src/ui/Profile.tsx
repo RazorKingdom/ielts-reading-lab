@@ -127,7 +127,7 @@ export default function ProfileView({ profile, onDataChanged, onToast }: Props) 
           {tab === 'marks' && (
             <>
               <div className="section-title">稍后复习的句子</div>
-              {profile.marks.length === 0 ? <Empty>还没有标记。在阅读工作台右键单击句子打开解析，点解析栏底部的「稍后复习」。</Empty> : (
+              {profile.marks.length === 0 ? <Empty>还没有标记。在阅读工作台中键单击句子，从菜单选「加入复测」。</Empty> : (
                 <table className="data-table">
                   <thead><tr><th>标记时间</th><th>原句</th><th>状态</th><th>操作</th></tr></thead>
                   <tbody>

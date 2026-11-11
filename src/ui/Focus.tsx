@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FeedbackLevel, SessionSnapshot, TrainingIntent } from '../core/types'
 import { api } from '../backend'
-import { Badge, Icon, statusLabel, statusTone } from './kit'
+import { Badge, Icon, reasonLabel, statusLabel, statusTone } from './kit'
 
 interface Props {
   sessionId: string
@@ -29,15 +29,22 @@ export default function Focus({ sessionId, showModelMeta, onReturn, onRestart, o
   const [transferDraft, setTransferDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [disputeOpen, setDisputeOpen] = useState(false)
   const [disputeNote, setDisputeNote] = useState('')
 
   useEffect(() => {
     let cancelled = false
     void api.resumeSession(sessionId).then((s) => {
-      if (cancelled || !s) return
+      if (cancelled) return
+      if (!s) {
+        setLoadError('训练现场不存在或已被删除。')
+        return
+      }
       setSnap(s)
       setDraft(s.session.draft)
+    }).catch((e) => {
+      if (!cancelled) setLoadError(e instanceof Error ? e.message : '恢复训练现场失败。')
     })
     return () => { cancelled = true }
   }, [sessionId])
@@ -69,6 +76,19 @@ export default function Focus({ sessionId, showModelMeta, onReturn, onRestart, o
     }
   }
 
+  if (loadError) {
+    return (
+      <div className="content-scroll">
+        <div className="content-inner">
+          <div className="notice-box danger">
+            <strong>无法进入训练：{loadError}</strong>
+            <div className="hint" style={{ marginTop: 6 }}>历史作答与诊断仍保留在学习档案中。</div>
+          </div>
+          <button className="btn" style={{ marginTop: 12 }} onClick={onReturn}>返回文章库</button>
+        </div>
+      </div>
+    )
+  }
   if (!snap) return <div className="loading">正在恢复训练现场…</div>
 
   const s = snap.session
@@ -107,10 +127,22 @@ export default function Focus({ sessionId, showModelMeta, onReturn, onRestart, o
           )}
           {s.lastError && s.state === 'DIAGNOSE_FAILED' && (
             <div className="notice-box danger">
-              诊断未完成，错误类别 <strong>{s.lastError}</strong>。你的回答已完整保存，未产生任何未经授权的费用。
-              <button className="btn sm" style={{ marginLeft: 10 }} disabled={!can('RETRY_DIAGNOSIS')} onClick={() => void send({ type: 'RETRY_DIAGNOSIS' })}>
-                重试诊断
-              </button>
+              <div><strong>诊断未完成（{s.lastError}）：</strong>{s.lastErrorNote ?? '请稍后重试。'}</div>
+              <div className="hint" style={{ marginTop: 4 }}>
+                你的回答已完整保存；本轮不会自动重试或切换计费来源，按配置可能已产生一次请求费用。
+              </div>
+              <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {s.lastError === 'QUOTA_EXCEEDED' ? (
+                  <span className="hint">额度受限：请先换端点或充值，再重试诊断。</span>
+                ) : (
+                  <button className="btn sm" disabled={!can('RETRY_DIAGNOSIS')} onClick={() => void send({ type: 'RETRY_DIAGNOSIS' })}>
+                    重试诊断
+                  </button>
+                )}
+                {(s.lastError === 'TOKEN_EXPIRED' || s.lastError === 'PROVIDER_DISABLED') && (
+                  <span className="hint">请在左侧「设置」中更新 API Key 或启用诊断。</span>
+                )}
+              </div>
             </div>
           )}
 
@@ -263,10 +295,13 @@ export default function Focus({ sessionId, showModelMeta, onReturn, onRestart, o
             <div className="card card-pad" style={{ marginBottom: 16 }}>
               <div className="section-title">教学决策（应用状态机最终裁决）</div>
               {snap.decisions.map((d, i) => (
-                <div className="attempt-row" key={d.id}>
+                <div key={d.id} className="attempt-row" style={{ flexWrap: 'wrap' }}>
                   <span className="seq">#{i + 1}</span>
                   <Badge tone="blue">{statusLabel(d.action)}</Badge>
-                  <span className="small muted">{d.reasonCodes.join(' · ')}</span>
+                  <span className="small muted">{d.reasonCodes.map(reasonLabel).join(' · ')}</span>
+                  {d.policyNote && (
+                    <span className="policy-box" style={{ flex: '1 0 100%', marginTop: 4 }}>策略说明：{d.policyNote}</span>
+                  )}
                   <span className="hint" style={{ marginLeft: 'auto' }}>{d.policyVersion}</span>
                 </div>
               ))}

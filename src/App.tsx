@@ -49,6 +49,7 @@ export default function App() {
   const [hostInfo, setHostInfo] = useState<HostInfo | null>(null)
   const [backendKind, setBackendKind] = useState<'electron-sqlite' | 'browser-localstorage'>('browser-localstorage')
   const [toast, setToast] = useState<string | null>(null)
+  const [bootError, setBootError] = useState<string | null>(null)
 
   async function refresh() {
     const boot = await api.bootstrap()
@@ -60,9 +61,21 @@ export default function App() {
   }
 
   useEffect(() => {
-    void refresh().finally(() => setLoading(false))
-    if (window.labHost) void window.labHost.getInfo().then(setHostInfo)
+    void refresh()
+      .then(() => setBootError(null))
+      .catch((e) => setBootError(e instanceof Error ? e.message : '初始化失败'))
+      .finally(() => setLoading(false))
+    if (window.labHost) void window.labHost.getInfo().then(setHostInfo).catch(() => undefined)
   }, [])
+
+  /** Run a write action with one consistent error channel. */
+  async function runAsync(action: () => Promise<void>, failPrefix: string): Promise<void> {
+    try {
+      await action()
+    } catch (e) {
+      setToast(`${failPrefix}：${e instanceof Error ? e.message : '未知错误'}`)
+    }
+  }
 
   useEffect(() => {
     if (!toast) return
@@ -76,26 +89,30 @@ export default function App() {
       return
     }
     if (next === 'focus' && !sessionId) {
-      setToast('请在阅读工作台里右键单击一个句子打开解析，再点解析栏底部的「进入引导训练」。')
+      setToast('请在阅读工作台里中键单击一个句子，从菜单选「推导训练」；或在解析栏底部点「进入引导训练」。')
       return
     }
     setView(next)
   }
 
   async function handleCreate(input: { title?: string; originalText: string }) {
-    const a = await api.createArticle(input)
-    await refresh()
-    setActiveArticle(a)
-    setView('reader')
+    await runAsync(async () => {
+      const a = await api.createArticle(input)
+      await refresh()
+      setActiveArticle(a)
+      setView('reader')
+    }, '导入文章失败')
   }
 
   async function handleDelete(id: string) {
-    await api.deleteArticle(id)
-    await refresh()
-    if (activeArticle?.id === id) {
-      setActiveArticle(null)
-      setView('library')
-    }
+    await runAsync(async () => {
+      await api.deleteArticle(id)
+      await refresh()
+      if (activeArticle?.id === id) {
+        setActiveArticle(null)
+        setView('library')
+      }
+    }, '删除文章失败')
   }
 
   async function handleStartTraining(req: TrainingRequest) {
@@ -141,6 +158,22 @@ export default function App() {
   }
 
   if (loading) return <div className="loading">正在启动 IELTS Reading Lab…</div>
+  if (bootError) {
+    return (
+      <div className="content-scroll">
+        <div className="content-inner">
+          <div className="notice-box danger">
+            <strong>启动失败：{bootError}</strong>
+            <div className="hint" style={{ marginTop: 6 }}>本地学习数据未被删除。请检查数据库文件权限后重试。</div>
+          </div>
+          <button className="btn" style={{ marginTop: 12 }} onClick={() => {
+            setLoading(true)
+            void refresh().then(() => setBootError(null)).catch((e) => setBootError(e instanceof Error ? e.message : '重试失败')).finally(() => setLoading(false))
+          }}>重试启动</button>
+        </div>
+      </div>
+    )
+  }
 
   const trainedSentenceIds = profile?.sessions.map((s) => s.sentenceId) ?? []
   const title = TITLES[view]

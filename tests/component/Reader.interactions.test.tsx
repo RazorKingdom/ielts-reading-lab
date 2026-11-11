@@ -60,7 +60,7 @@ describe('component: Reader three-button interactions', () => {
     ;(document as unknown as { caretRangeFromPoint: () => null }).caretRangeFromPoint = () => null
   })
 
-  it('right-click shows a meaning popover and NEVER marks the answer as viewed', async () => {
+  it('right-click shows a meaning popover and marks the answer as viewed', async () => {
     const p = props()
     render(<Reader {...p} />)
     const el = sentenceEl()
@@ -69,9 +69,22 @@ describe('component: Reader three-button interactions', () => {
     expect(screen.getByText('句子语义')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByText(MEANING)).toBeInTheDocument())
     expect(apiMock.getAnalysis).toHaveBeenCalledTimes(1)
-    // The core invariant: a meaning peek must not spoil independent training.
-    expect(apiMock.markAnalysisViewed).not.toHaveBeenCalled()
+    // Reference meaning == L3 answer: a peek disqualifies unaided attribution.
+    expect(apiMock.markAnalysisViewed).toHaveBeenCalledTimes(1)
+    expect(screen.getByText(/已标记为看过答案/)).toBeInTheDocument()
     expect(screen.queryByText('结构 / Structure')).not.toBeInTheDocument()
+  })
+
+  it('right-click caches meaning per sentence: a second peek does not re-fetch', async () => {
+    render(<Reader {...props()} />)
+    const el = sentenceEl()
+    mouse(el, 'contextmenu', 2)
+    await waitFor(() => expect(screen.getByText(MEANING)).toBeInTheDocument())
+    act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
+    mouse(el, 'contextmenu', 2)
+    await waitFor(() => expect(screen.getByText(MEANING)).toBeInTheDocument())
+    expect(apiMock.getAnalysis).toHaveBeenCalledTimes(1) // cached
+    expect(apiMock.markAnalysisViewed).toHaveBeenCalledTimes(2) // exposure still recorded
   })
 
   it('right-click popover survives a re-click on another sentence without stale meaning', async () => {
@@ -142,13 +155,30 @@ describe('component: Reader three-button interactions', () => {
     expect(screen.queryByText('句子操作')).not.toBeInTheDocument()
   })
 
-  it('keyboard Enter still opens the full analysis directly', async () => {
-    render(<Reader {...props()} />)
+  it('keyboard Enter opens analysis and warns once about answer exposure', async () => {
+    const p = props()
+    render(<Reader {...p} />)
     act(() => {
       sentenceEl().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     })
     await waitFor(() => expect(apiMock.markAnalysisViewed).toHaveBeenCalledTimes(1))
     expect(screen.getByText('结构 / Structure')).toBeInTheDocument()
+    expect(p.onToast).toHaveBeenCalledWith(expect.stringContaining('答案已暴露'))
+  })
+
+  it('left click clears a leftover drag selection so it never hijacks word picking', () => {
+    render(<Reader {...props()} />)
+    // Simulate a stale selection left over from a previous drag.
+    const text = sentenceEl().firstChild!
+    const range = document.createRange()
+    range.selectNodeContents(text)
+    const sel = window.getSelection()!
+    sel.removeAllRanges()
+    sel.addRange(range)
+    expect(sel.toString().length).toBeGreaterThan(0)
+
+    mouse(sentenceEl(), 'click', 0)
+    expect(window.getSelection()?.toString() ?? '').toBe('')
   })
 
   it('left-click with no caret word closes popovers rather than opening a menu', () => {

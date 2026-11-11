@@ -47,6 +47,11 @@ export default function Reader({
   const scrollRef = useRef<HTMLDivElement>(null)
   const positionRef = useRef<ReadingPosition | null>(null)
   const scrollTimer = useRef<number | null>(null)
+  // Right-click meaning cache: one entry per sentence, reset per article.
+  const meaningCache = useRef<Map<string, string>>(new Map())
+  const meaningRequest = useRef(0)
+  const selectionHandled = useRef(false)
+  const exposureWarned = useRef(false)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -82,12 +87,20 @@ export default function Reader({
 
   useEffect(() => {
     let cancelled = false
+    meaningCache.current.clear()
+    meaningRequest.current++
+    setWordTool(null)
+    setSentenceTool(null)
+    setSentenceMenu(null)
     void api.getReadingPosition(article.id).then((p) => {
       if (cancelled) return
       positionRef.current = p
       if (p) requestAnimationFrame(() => restore(p))
     })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      if (scrollTimer.current) window.clearTimeout(scrollTimer.current)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [article.id])
 
@@ -108,15 +121,10 @@ export default function Reader({
       if (!target.closest('.sentence-menu')) setSentenceMenu(null)
     }
     document.addEventListener('mousedown', onDocClick)
-    // Middle-click auto-scroll must not fight the popover.
-    const onAux = (e: globalThis.MouseEvent) => {
-      if (e.button === 1) e.preventDefault()
-    }
-    document.addEventListener('auxclick', onAux, true)
-    return () => {
-      document.removeEventListener('mousedown', onDocClick)
-      document.removeEventListener('auxclick', onAux, true)
-    }
+    // Middle-click auto-scroll is prevented only on sentences (see
+    // onSentenceAuxClick). Other areas, including the analysis sidebar, keep
+    // the browser's normal middle-click scrolling.
+    return () => document.removeEventListener('mousedown', onDocClick)
   }, [])
 
   function handleScroll() {
@@ -186,9 +194,13 @@ export default function Reader({
     const range = selection.getRangeAt(0)
     if (!scrollRef.current?.contains(range.commonAncestorContainer)) return
     const rect = range.getBoundingClientRect()
+    selectionHandled.current = true
+    selection.removeAllRanges() // don't leave the drag selection stuck for later clicks
+    setSentenceTool(null)
+    setSentenceMenu(null)
     setWordTool({
-      x: Math.max(8, Math.min(e.clientX, window.innerWidth - 300)),
-      y: Math.max(8, Math.min(rect.bottom + 10, window.innerHeight - 300)),
+      x: Math.max(8, Math.min(e.clientX, window.innerWidth - 320)),
+      y: Math.max(8, Math.min(rect.bottom + 10, window.innerHeight - 310)),
       text: text.slice(0, 80),
     })
   }
@@ -208,12 +220,18 @@ export default function Reader({
 
   /** Left button = take the word under the pointer (or a drag-selected phrase). */
   function onSentenceClick(e: ReactMouseEvent) {
-    const selected = window.getSelection()?.toString().trim() ?? ''
-    const word = selected || wordAtPointer(e.clientX, e.clientY)
-    // A left click dismisses the right-click meaning popover and the middle
-    // menu: starting a new interaction should not leave stale layers open.
     setSentenceTool(null)
     setSentenceMenu(null)
+    // If mouseup already opened a phrase card from a drag, don't let the
+    // following click replace it with a single word.
+    if (selectionHandled.current) {
+      selectionHandled.current = false
+      return
+    }
+    // A plain click uses the caret under the pointer. Clear any leftover
+    // selection so later clicks never get stuck on an old drag (P0-1).
+    window.getSelection()?.removeAllRanges()
+    const word = wordAtPointer(e.clientX, e.clientY)
     if (!word) {
       setWordTool(null)
       return
@@ -226,8 +244,8 @@ export default function Reader({
   }
 
   /** Right button = lightweight translation popover (Shanbay-style).
-   * Deliberately does NOT mark analysis as viewed: this only shows the meaning,
-   * not the structure/targets, so training can still be credited as unaided. */
+   * The meaning shown here is the same reference understanding as L3, so it
+   * DOES mark analysis as viewed: training after a peek is not "unaided". */
   function onSentenceContextMenu(e: ReactMouseEvent, s: Sentence) {
     e.preventDefault()
     e.stopPropagation()
@@ -242,6 +260,17 @@ export default function Reader({
       meaning: '',
       loading: true,
     })
+    // Record exposure immediately: the user is about to see the reference
+    // meaning, which disqualifies "first unaided correct" attribution.
+    void api.markAnalysisViewed(article.id, s.id)
+    const cached = meaningCache.current.get(s.id)
+    if (cached !== undefined) {
+      setSentenceTool((cur) =>
+        cur?.sentenceId === s.id ? { ...cur, meaning: cached, loading: false } : cur,
+      )
+      return
+    }
+    const request = ++meaningRequest.current
     const ctx = contextOf(s)
     void api.getAnalysis({
       articleId: article.id,
@@ -252,12 +281,17 @@ export default function Reader({
       contextBefore: ctx.before,
       contextAfter: ctx.after,
     }).then((a) => {
+      meaningCache.current.set(s.id, a.meaning)
       setSentenceTool((cur) =>
-        cur?.sentenceId === s.id ? { ...cur, meaning: a.meaning, loading: false } : cur,
+        cur?.sentenceId === s.id && request === meaningRequest.current
+          ? { ...cur, meaning: a.meaning, loading: false }
+          : cur,
       )
     }).catch(() => {
       setSentenceTool((cur) =>
-        cur?.sentenceId === s.id ? { ...cur, meaning: '暂无参考译文。', loading: false } : cur,
+        cur?.sentenceId === s.id && request === meaningRequest.current
+          ? { ...cur, meaning: '暂无参考译文。', loading: false }
+          : cur,
       )
     })
   }
@@ -277,10 +311,15 @@ export default function Reader({
     })
   }
 
-  /** Keyboard (Enter/Space) keeps the direct-analysis path for accessibility. */
+  /** Keyboard (Enter/Space) opens full analysis. Because that records answer
+   * exposure, warn once so keyboard users can make an informed choice. */
   function onSentenceKey(e: ReactKeyboardEvent, s: Sentence) {
     if (e.key !== 'Enter' && e.key !== ' ') return
     e.preventDefault()
+    if (!exposureWarned.current) {
+      exposureWarned.current = true
+      onToast('Enter 将打开完整解析，此句会被标记为「答案已暴露」。')
+    }
     void openSidebar(s)
   }
 
@@ -360,7 +399,7 @@ export default function Reader({
                       data-sid={s.id}
                       tabIndex={0}
                       role="button"
-                      aria-label={`选择句子：${s.text}`}
+                      aria-label={`句子：${s.text}。左键取词，右键看语义，中键选操作，回车打开完整解析（将标记答案已暴露）`}
                       className={[
                         'sentence',
                         activeSentenceId === s.id ? 'active' : '',
@@ -539,7 +578,7 @@ export default function Reader({
           <div className="st-meaning">
             {sentenceTool.loading ? '正在获取语义…' : sentenceTool.meaning}
           </div>
-          <div className="st-hint">中键点句展开完整解析与训练</div>
+          <div className="st-hint">已标记为看过答案 · 中键点句可展开完整解析与训练</div>
         </div>
       )}
 
