@@ -6,7 +6,7 @@
 
 ### 已打包应用（推荐，无需命令行）
 
-桌面上有一个 **`IELTS Reading Lab.cmd`** 启动器——**双击它即可打开应用**，不需要命令行。它会自动清除环境变量并启动 `release\IELTS Reading Lab v8\IELTS Reading Lab.exe`（整个目录可拷贝到别处或分发，数据仍存当前用户的 `%APPDATA%\ielts-reading-lab`，与程序目录分离）。
+桌面上有一个 **`IELTS Reading Lab.cmd`** 启动器——**双击它即可打开应用**，不需要命令行。它会自动清除环境变量并启动 `release\IELTS Reading Lab v9\IELTS Reading Lab.exe`（整个目录可拷贝到别处或分发，数据仍存当前用户的 `%APPDATA%\ielts-reading-lab`，与程序目录分离）。
 
 打包应用位于 `release\IELTS Reading Lab v2\IELTS Reading Lab.exe`（整个目录可拷贝到任意位置或分发给别人，数据仍存在当前用户的 `%APPDATA%\ielts-reading-lab`，与程序目录分离）。
 

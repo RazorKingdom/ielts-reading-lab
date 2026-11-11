@@ -24,7 +24,7 @@
     "knownDocDrift": [
       "docs/CONTRACT.md §6 写「9 条对抗样本」，src/core/samples.ts 实际为 10 条（A01–A10）",
       "docs/ARCHITECTURE.md §3.2 仍写 onSentenceAuxClick，代码已改为 onSentenceMouseDown（真实中键不派发 auxclick）",
-      "README.md 与 docs/ARCHITECTURE.md 的「89 项单测 + 52 项自检」已过期，当前为 202 项 Vitest + 54 项 smoke",
+      "README.md 与 docs/ARCHITECTURE.md 的「89 项单测 + 52 项自检」已过期，当前为 203 项 Vitest + 54 项 smoke",
       "docs/CONTRACT.md §8 的覆盖统计仍是早期阶段，docs/TESTING.md §5 才是当前统计"
     ]
   },
@@ -33,7 +33,7 @@
     "name": "IELTS Reading Lab",
     "packageName": "ielts-reading-lab",
     "packageVersion": "1.0.0",
-    "desktopRelease": "v8",
+    "desktopRelease": "v9",
     "description": "离线可用的 IELTS 学术长难句阅读训练桌面应用：100 篇原创文章、逐句中文参考理解、离线查词、中文自由表达诊断、L0–L3 渐进反馈，可选接入 OpenAI 兼容第三方 API。",
     "appType": "Electron 桌面应用（同时提供浏览器预览后端）",
     "platform": "Windows x64",
@@ -244,7 +244,7 @@
     "outputs": {
       "dist": "Vite 前端产物",
       "dist-electron": "编译后的主进程 / preload / core",
-      "release": "release/IELTS Reading Lab v8/IELTS Reading Lab.exe（便携版，约 180 MiB）"
+      "release": "release/IELTS Reading Lab v9/IELTS Reading Lab.exe（便携版，约 180 MiB）"
     },
     "freshnessGuard": "scripts/ensure-build.cjs：源码比 dist 新则自动重建，接入 smoke / verify:* / test:all，避免测到旧 bundle",
     "launcher": "C:\\Users\\Razor\\Desktop\\IELTS Reading Lab.cmd（清除 ELECTRON_RUN_AS_NODE 后启动 v8 exe）",
@@ -253,7 +253,7 @@
   },
 
   "verification": {
-    "vitest": { "total": 202, "files": 24, "groups": { "root": 89, "unit": 45, "integration": 16, "component": 25, "regression": 27 } },
+    "vitest": { "total": 203, "files": 24, "groups": { "root": 89, "unit": 45, "integration": 16, "component": 26, "regression": 27 } },
     "smoke": { "checks": 54, "script": "scripts/smoke-electron.cjs", "scope": "真实 Electron + sql.js SQLite + preload sandbox + 打包文案与白名单" },
     "realInputChecks": [
       { "command": "npm run verify:middleclick", "asserts": "真实 sendInputEvent 中键 → .sentence-action-menu 与三项菜单 + mousedown|1" },

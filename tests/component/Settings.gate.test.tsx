@@ -60,6 +60,15 @@ describe('component: Settings API configuration gate', () => {
     expect(screen.getByRole('button', { name: /启用诊断/ })).toBeDisabled()
   })
 
+  it('renders the API Key as a non-echoing password field', async () => {
+    renderSettings()
+    await waitFor(() => expect(apiMock.getApiConfig).toHaveBeenCalled())
+    const inputs = [...document.querySelectorAll<HTMLInputElement>('input')]
+    expect(inputs.slice(0, 2).map((i) => i.type)).toEqual(['text', 'text'])
+    expect(inputs[2].type).toBe('password')
+    expect(inputs[2].placeholder).toMatch(/已加密保存|sk-/)
+  })
+
   it('saving trims the URL and model before calling the API', async () => {
     renderSettings()
     await waitFor(() => expect(apiMock.getApiConfig).toHaveBeenCalled())

@@ -123,11 +123,13 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .badge.yellow { background: var(--warn-soft); color: var(--warn); border-color: #eee0b9; }
 .badge.purple { background: var(--purple-soft); color: var(--purple); border-color: #e1d7f2; }
 
-textarea, input[type='text'] {
+textarea, input[type='text'], input[type='password'] {
   width: 100%; border: 1px solid var(--border-strong); border-radius: 8px; padding: 10px 12px;
   background: var(--surface); outline: none; transition: .15s; resize: vertical;
 }
-textarea:focus, input[type='text']:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+textarea:focus, input[type='text']:focus, input[type='password']:focus {
+  border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft);
+}
 label.field-label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 7px; }
 
 /* ------------------------------- library ------------------------------ */
