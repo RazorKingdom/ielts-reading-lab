@@ -402,9 +402,9 @@ export default function Reader({
                 </div>
                 <div className="analysis-block">
                   <h4>结构 / Structure</h4>
-                  <div className="kv-row"><span className="kv-key">Subject</span><span>{analysis.skeleton.subject}</span></div>
-                  <div className="kv-row"><span className="kv-key">Predicate</span><span>{analysis.skeleton.predicate}</span></div>
-                  <div className="kv-row"><span className="kv-key">Object</span><span>{analysis.skeleton.object || '—'}</span></div>
+                  <div className="kv-row"><span className="kv-key">主语</span><span>{analysis.skeleton.subject}</span></div>
+                  <div className="kv-row"><span className="kv-key">谓语</span><span>{analysis.skeleton.predicate}</span></div>
+                  <div className="kv-row"><span className="kv-key">宾语 / 表语</span><span>{analysis.skeleton.object || '—'}</span></div>
                 </div>
 
                 <div className="analysis-block">
