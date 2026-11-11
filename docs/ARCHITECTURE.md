@@ -62,7 +62,7 @@
 3. 返回 `{ articles, settings, providers, profile, backendKind }`。
 
 ### 3.2 解析（右键语义悬浮窗 / 中键菜单 → 直接解析）
-`Reader.onSentenceContextMenu`（右键，显示译文悬浮窗、不写曝光）或 `onSentenceAuxClick`（中键，三选菜单）→ `openSidebar(s)` → `api.getAnalysis(...)` → `runtime.getAnalysis` → `analysisWithOffline()`：
+`Reader.onSentenceContextMenu`（右键，显示译文悬浮窗，**同样写曝光**：语义与 L3 参考理解同源）或 `onSentenceAuxClick`（中键，三选菜单）→ `openSidebar(s)` → `api.getAnalysis(...)` → `runtime.getAnalysis` → `analysisWithOffline()`：
 - 命中内置句：中文译文 + 英文主谓宾 + 意群 + 追问，标注 `source: 'bundled'`；
 - 未命中（用户导入）：本地保守分析，`source: 'local'`。
 - 同时 `markAnalysisViewed()` 写曝光记录（append-only），训练时会带 `directAnalysisSeen` 标记。
