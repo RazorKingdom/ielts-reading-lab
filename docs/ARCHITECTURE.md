@@ -61,8 +61,8 @@
 2. 读 `settings.sampleBankVersion`；若 ≠ `ARTICLE_BANK_VERSION`（当前 2），覆盖已存在内置文章内容（保留 `createdAt`），补齐缺失项，删除过的内置文章不复活。
 3. 返回 `{ articles, settings, providers, profile, backendKind }`。
 
-### 3.2 解析（右键点句 → 直接解析）
-`Reader.onSentenceContextMenu` → `openSidebar(s)` → `api.getAnalysis(...)` → `runtime.getAnalysis` → `analysisWithOffline()`：
+### 3.2 解析（右键语义悬浮窗 / 中键菜单 → 直接解析）
+`Reader.onSentenceContextMenu`（右键，显示译文悬浮窗、不写曝光）或 `onSentenceAuxClick`（中键，三选菜单）→ `openSidebar(s)` → `api.getAnalysis(...)` → `runtime.getAnalysis` → `analysisWithOffline()`：
 - 命中内置句：中文译文 + 英文主谓宾 + 意群 + 追问，标注 `source: 'bundled'`；
 - 未命中（用户导入）：本地保守分析，`source: 'local'`。
 - 同时 `markAnalysisViewed()` 写曝光记录（append-only），训练时会带 `directAnalysisSeen` 标记。
@@ -121,4 +121,4 @@ SQLite `records` 表（append-only）：`seq / kind / id / payload`。`kind` 包
 | `dictionary.test.ts` | 精确/词形还原/未收录/点击位置取词（7 项） |
 | `explanations.test.ts` | 3,605 句骨架覆盖、英文片段、targets 不变、导入句回落（6 项） |
 
-`scripts/smoke-electron.cjs` 是真实 Electron 端到端自检（50 项），覆盖 SQLite 持久化与重启恢复、IPC 白名单、sandbox preload、React 渲染、字号 CSS 变量、右键交互、文案清理、密钥加密与导出排除。
+`scripts/smoke-electron.cjs` 是真实 Electron 端到端自检（51 项），覆盖 SQLite 持久化与重启恢复、IPC 白名单、sandbox preload、React 渲染、字号 CSS 变量、右键交互、文案清理、密钥加密与导出排除。

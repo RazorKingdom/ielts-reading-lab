@@ -85,15 +85,21 @@ app.whenReady().then(async () => {
     `${builtInAnalysis.skeleton.subject} / ${builtInAnalysis.skeleton.predicate}`,
   )
 
-  // Right-click now opens analysis directly; the three-item sentence menu was
-  // removed and "稍后复习" moved to the analysis pane footer.
+  // Interaction: left = word, right = compact meaning popover, middle = the
+  // three-choice action menu (direct analysis / derived training / review).
   const rendererJs = fs.readFileSync(
     path.join(ROOT, 'dist', 'assets', fs.readdirSync(path.join(ROOT, 'dist', 'assets')).find((f) => f.endsWith('.js'))),
     'utf8',
   )
   check(
-    '右键即解析：三选菜单文案已移除',
-    !rendererJs.includes('选择这一句的处理方式'),
+    '右键语义悬浮窗存在（扇贝式，不标曝光）',
+    rendererJs.includes('句子语义') && rendererJs.includes('st-meaning') &&
+      rendererJs.includes('中键点句展开完整解析与训练'),
+  )
+  check(
+    '中键三选菜单：直接解析 / 推导训练 / 加入复测',
+    rendererJs.includes('直接解析') && rendererJs.includes('推导训练') && rendererJs.includes('加入复测') &&
+      rendererJs.includes('onAuxClick'),
   )
   check(
     '稍后复习按钮已移入解析栏底部',

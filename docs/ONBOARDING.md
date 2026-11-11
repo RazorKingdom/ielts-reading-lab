@@ -8,7 +8,7 @@
 |---|---|
 | 产品 | Windows Electron + React 18 + TS + Vite 的 IELTS 长难句阅读训练应用，个人使用 |
 | 运行 | `npm install && npm start`（桌面）；`npm run dev:web`（浏览器预览，localStorage） |
-| 验证 | `npm run typecheck` / `npm run test`（89 项）/ `npm run smoke`（50 项）/ `npm run build` |
+| 验证 | `npm run typecheck` / `npm run test`（89 项）/ `npm run smoke`（51 项）/ `npm run build` |
 | 数据 | 主进程 sql.js WASM SQLite（`%APPDATA%\ielts-reading-lab\reading-lab.sqlite`）；浏览器预览为 localStorage，两者不互通 |
 | 内置内容 | 100 篇原创 IELTS 风格文章（706–794 词/篇）+ 3,605 句中文译文与英文主谓宾 + 11,828 条 ECDICT 离线词库；全部随包，零网络 |
 | AI | 设置页仅一张「第三方 API（OpenAI 兼容）」卡片；密钥 DPAPI 加密存主进程；默认离线规则兜底不展示 |
@@ -39,7 +39,7 @@ docs/POC-RESULT.md           历史阶段 0 核查，结论 BLOCKED，不代表�
 
 | 早期构想 | 当前实现 | 变更原因 |
 |---|---|---|
-| 单击句子弹三选菜单 | **右键点句直接开解析**；训练/稍后复习在解析栏底部按钮 | 用户嫌菜单繁琐；解析栏底部本来就能进训练 |
+| 单击句子弹三选菜单 | **左键取词 / 右键语义悬浮窗 / 中键三选菜单**（直接解析、推导训练、加入复测） | 早期嫌菜单繁琐改为右键直开；后按用户要求恢复三选入口，并把语义预览独立为右键悬浮窗 |
 | 首选 SIWC / 4 类 Provider 可替换 | 设置页**只有一张 OpenAI 兼容第三方 API 卡片**；SIWC/本地/Codex 代码与界面全删 | 用户要求"去掉其他 provider，只留第三方 API" |
 | 用户粘贴纯文本，无内置内容 | 内置 **100 篇原创文章 + 逐句解析 + 离线词库** | 用户要求"找 100 篇雅思文章"；真题受版权保护，改为原创合成 |
 | 直接解析是本地规则，译文是占位 | **3,605 句随包中文译文 + 英文主谓宾**，零请求 | 用户要求补全 100 篇的解析，且不用接 API |
@@ -101,8 +101,8 @@ npm run typecheck     # renderer 类型
 npx tsc -p tsconfig.electron.json --noEmit   # 主进程类型
 npm run test          # 89 项单元测试（约 4 s）
 npm run build         # 主进程 + preload bundle + renderer
-npm run smoke         # 50 项 Electron 端到端自检
-npm run package       # 组装免命令行便携版到 release/IELTS Reading Lab v2/
+npm run smoke         # 51 项 Electron 端到端自检
+npm run package       # 组装免命令行便携版到 release/IELTS Reading Lab v3/
 ```
 
 打包说明：`npm run package` 走 `scripts/package-app.cjs`——复制 Electron 运行时 + 把应用放在 `resources/app/` 真实目录（非 asar），sql.js 及 WASM 也在其中，因此 `require('sql.js')` 与 WASM 路径都能解析。`db.ts` 的 `findWasmDir()` 兼容 dev / asar-unpacked / 真实 app 目录三种布局。桌面启动器 `IELTS Reading Lab.cmd` 双击即用（自动清除 `ELECTRON_RUN_AS_NODE`）。设置 `LAB_VERIFY=1` 启动会在 `%APPDATA%\ielts-reading-lab\packaged-probe.json` 写一份健康探针（数据库就绪、IPC 方法数、界面渲染状态），用于验证打包产物。

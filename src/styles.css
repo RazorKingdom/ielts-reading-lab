@@ -198,6 +198,31 @@ label.field-label { display: block; font-size: 12px; font-weight: 600; margin-bo
 .menu-item .mi-desc { font-size: 10.5px; color: var(--text-3); line-height: 1.45; }
 .menu-item .mi-icon { width: 20px; text-align: center; color: var(--primary); flex: 0 0 20px; }
 
+/* Right-click: Shanbay-style compact meaning popover. */
+.sentence-tool {
+  position: fixed; z-index: 61; width: 320px; padding: 10px 12px 9px;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 12px; box-shadow: 0 12px 36px rgba(20, 28, 42, .18);
+}
+.sentence-tool .st-head {
+  font-size: 11px; color: var(--text-3); letter-spacing: .04em;
+  padding-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+.sentence-tool .st-sentence {
+  font-family: var(--serif); font-size: 12px; line-height: 1.5; color: var(--text-2);
+  margin: 8px 0 6px; max-height: 56px; overflow-y: auto;
+}
+.sentence-tool .st-meaning {
+  font-size: 13px; line-height: 1.7; color: var(--text);
+  max-height: 120px; overflow-y: auto;
+}
+.sentence-tool .st-hint {
+  font-size: 10.5px; color: var(--text-3); margin-top: 8px; padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.sentence-action-menu { width: 250px; }
+.sentence-action-menu .menu-item { gap: 9px; }
+
 .analysis-sidebar {
   width: 400px; flex: 0 0 400px; border-left: 1px solid var(--border); background: var(--surface);
   display: flex; flex-direction: column; overflow: hidden;

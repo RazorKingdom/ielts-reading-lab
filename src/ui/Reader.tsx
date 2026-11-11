@@ -25,6 +25,10 @@ interface Props {
 }
 
 interface WordToolState { x: number; y: number; text: string }
+/** Right-click: compact popover showing only the sentence's Chinese meaning. */
+interface SentenceToolState { x: number; y: number; sentenceId: string; sentenceText: string; meaning: string; loading: boolean }
+/** Middle-click: the original three-choice menu. */
+interface SentenceMenuState { x: number; y: number; sentence: Sentence }
 
 export default function Reader({
   article, fontScale, marks, trainedSentenceIds, onBack, onStartTraining, onDataChanged, onToast,
@@ -33,6 +37,8 @@ export default function Reader({
   const sentences = useMemo(() => allSentences(paragraphs), [paragraphs])
 
   const [wordTool, setWordTool] = useState<WordToolState | null>(null)
+  const [sentenceTool, setSentenceTool] = useState<SentenceToolState | null>(null)
+  const [sentenceMenu, setSentenceMenu] = useState<SentenceMenuState | null>(null)
   const [activeSentenceId, setActiveSentenceId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [analysis, setAnalysis] = useState<SentenceAnalysis | null>(null)
@@ -46,6 +52,8 @@ export default function Reader({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setWordTool(null)
+        setSentenceTool(null)
+        setSentenceMenu(null)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -96,9 +104,19 @@ export default function Reader({
     const onDocClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       if (!target.closest('.word-tool')) setWordTool(null)
+      if (!target.closest('.sentence-tool')) setSentenceTool(null)
+      if (!target.closest('.sentence-menu')) setSentenceMenu(null)
     }
     document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
+    // Middle-click auto-scroll must not fight the popover.
+    const onAux = (e: globalThis.MouseEvent) => {
+      if (e.button === 1) e.preventDefault()
+    }
+    document.addEventListener('auxclick', onAux, true)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('auxclick', onAux, true)
+    }
   }, [])
 
   function handleScroll() {
@@ -203,15 +221,59 @@ export default function Reader({
     })
   }
 
-  /** Right button = open the analysis pane for the whole sentence directly. */
+  /** Right button = lightweight translation popover (Shanbay-style).
+   * Deliberately does NOT mark analysis as viewed: this only shows the meaning,
+   * not the structure/targets, so training can still be credited as unaided. */
   function onSentenceContextMenu(e: ReactMouseEvent, s: Sentence) {
     e.preventDefault()
+    e.stopPropagation()
     window.getSelection()?.removeAllRanges()
     setWordTool(null)
-    void openSidebar(s)
+    setSentenceMenu(null)
+    setSentenceTool({
+      x: Math.max(8, Math.min(e.clientX, window.innerWidth - 330)),
+      y: Math.max(8, Math.min(e.clientY + 12, window.innerHeight - 200)),
+      sentenceId: s.id,
+      sentenceText: s.text,
+      meaning: '',
+      loading: true,
+    })
+    const ctx = contextOf(s)
+    void api.getAnalysis({
+      articleId: article.id,
+      sentenceId: s.id,
+      sentenceText: s.text,
+      paragraphNo: s.paragraphNo,
+      articleVersion: s.articleVersion,
+      contextBefore: ctx.before,
+      contextAfter: ctx.after,
+    }).then((a) => {
+      setSentenceTool((cur) =>
+        cur?.sentenceId === s.id ? { ...cur, meaning: a.meaning, loading: false } : cur,
+      )
+    }).catch(() => {
+      setSentenceTool((cur) =>
+        cur?.sentenceId === s.id ? { ...cur, meaning: '暂无参考译文。', loading: false } : cur,
+      )
+    })
   }
 
-  /** Keyboard (Enter/Space) mirrors the right-click: straight to analysis. */
+  /** Middle button = the original three-choice action menu. */
+  function onSentenceAuxClick(e: ReactMouseEvent, s: Sentence) {
+    if (e.button !== 1) return
+    e.preventDefault()
+    e.stopPropagation()
+    window.getSelection()?.removeAllRanges()
+    setWordTool(null)
+    setSentenceTool(null)
+    setSentenceMenu({
+      x: Math.max(8, Math.min(e.clientX, window.innerWidth - 250)),
+      y: Math.max(8, Math.min(e.clientY + 10, window.innerHeight - 210)),
+      sentence: s,
+    })
+  }
+
+  /** Keyboard (Enter/Space) keeps the direct-analysis path for accessibility. */
   function onSentenceKey(e: ReactKeyboardEvent, s: Sentence) {
     if (e.key !== 'Enter' && e.key !== ' ') return
     e.preventDefault()
@@ -220,6 +282,8 @@ export default function Reader({
 
   async function openSidebar(s: Sentence) {
     setWordTool(null)
+    setSentenceTool(null)
+    setSentenceMenu(null)
     setActiveSentenceId(s.id)
     setSidebarOpen(true)
     setAnalysis(null)
@@ -245,12 +309,14 @@ export default function Reader({
   }
 
   async function startTraining(s: Sentence) {
+    setSentenceMenu(null)
     const ctx = contextOf(s)
     const seen = await api.hasAnalysisBeenViewed(article.id, s.id)
     onStartTraining({ sentence: s, contextBefore: ctx.before, contextAfter: ctx.after, directAnalysisSeen: seen })
   }
 
   async function markLater(s: Sentence) {
+    setSentenceMenu(null)
     await api.addMark({ articleId: article.id, sentenceId: s.id, sentenceText: s.text, note: '稍后复习' })
     onDataChanged()
     onToast('已加入「稍后复习」，并排入复测队列。')
@@ -299,6 +365,7 @@ export default function Reader({
                       ].filter(Boolean).join(' ')}
                       onClick={(e) => onSentenceClick(e)}
                       onContextMenu={(e) => onSentenceContextMenu(e, s)}
+                      onAuxClick={(e) => onSentenceAuxClick(e, s)}
                       onKeyDown={(e) => onSentenceKey(e, s)}
                     >
                       {s.text}{' '}
@@ -322,7 +389,7 @@ export default function Reader({
           <div className="side-body">
             {analysisLoading && <div className="loading">正在生成结构解析…</div>}
             {!analysisLoading && !analysis && (
-              <div className="empty">右键单击句子查看解析</div>
+              <div className="empty">中键单击句子，或直接点工具栏「解析栏」</div>
             )}
             {analysis && activeSentenceId && (
               <>
@@ -457,6 +524,38 @@ export default function Reader({
                 <div className="hint" style={{ marginTop: 8 }}>{result.note}</div>
               )}
             </div>
+          </div>
+        )
+      })()}
+
+      {sentenceTool && (
+        <div className="sentence-tool" style={{ left: sentenceTool.x, top: sentenceTool.y }}>
+          <div className="st-head">句子语义</div>
+          <div className="st-sentence">{sentenceTool.sentenceText}</div>
+          <div className="st-meaning">
+            {sentenceTool.loading ? '正在获取语义…' : sentenceTool.meaning}
+          </div>
+          <div className="st-hint">中键点句展开完整解析与训练</div>
+        </div>
+      )}
+
+      {sentenceMenu && (() => {
+        const s = sentenceMenu.sentence
+        return (
+          <div className="sentence-menu sentence-action-menu" style={{ left: sentenceMenu.x, top: sentenceMenu.y }}>
+            <div className="menu-head">句子操作</div>
+            <button className="menu-item" onClick={() => void openSidebar(s)}>
+              <span className="mi-icon">◎</span>
+              <span><span className="mi-title">直接解析</span><br /><span className="mi-desc">查看结构、意群与完整译文（答案将标记为已暴露）</span></span>
+            </button>
+            <button className="menu-item" onClick={() => void startTraining(s)}>
+              <span className="mi-icon">◇</span>
+              <span><span className="mi-title">推导训练</span><br /><span className="mi-desc">用自己的中文表达理解，进入渐进式引导训练</span></span>
+            </button>
+            <button className="menu-item" onClick={() => void markLater(s)}>
+              <span className="mi-icon">◷</span>
+              <span><span className="mi-title">加入复测</span><br /><span className="mi-desc">排入稍后复习队列，稍后安排独立复测</span></span>
+            </button>
           </div>
         )
       })()}

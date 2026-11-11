@@ -22,7 +22,7 @@
 | ChatGPT Plus/Pro 订阅额度消耗 | **无** | 无密钥、无凭据、无计费来源、无费用 |
 | 独立计费 API / 非官方代理 / 客户端 token 提取 | **无** | 代码库内不存在相关实现 |
 | 本仓库所有「诊断结果」 | **本地规则模拟** | `src/core/diagnose.ts` 的 `MockRuleProvider`，确定性中文关键词规则，非大模型输出 |
-| SQLite 持久化 / IPC / preload / React 渲染 | **真实执行** | `npm run smoke`，50/50 通过，见 `scripts/smoke-result.json`（数字为最新版本；本文记录的是当时的 30/30） |
+| SQLite 持久化 / IPC / preload / React 渲染 | **真实执行** | `npm run smoke`，51/51 通过，见 `scripts/smoke-result.json`（数字为最新版本；本文记录的是当时的 30/30） |
 | 单元测试 | **真实执行** | `npm run test`，88/88 通过（对纯逻辑与 Mock 的行为验证；本文记录的是当时的 57/57） |
 | 断网 / 取消 / 半段流恢复 | **模拟验证** | `FailingProvider`、`PartialProvider` 注入的单元测试，非真实网络故障 |
 
