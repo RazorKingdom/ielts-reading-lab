@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
   available: true,
   encryptionThrows: false,
   decryptThrows: false,
+  encryptCalls: [] as string[],
+  decryptCalls: [] as string[],
 }))
 
 vi.mock('electron', () => ({
@@ -20,8 +22,12 @@ vi.mock('electron', () => ({
       if (state.encryptionThrows) throw new Error('no secure store')
       return state.available
     },
-    encryptString: (s: string) => Buffer.from('enc:' + [...s].reverse().join('')),
+    encryptString: (s: string) => {
+      state.encryptCalls.push(s)
+      return Buffer.from('enc:' + [...s].reverse().join(''))
+    },
     decryptString: (b: Buffer) => {
+      state.decryptCalls.push(b.toString())
       if (state.decryptThrows) throw new Error('corrupt')
       return [...b.toString().replace(/^enc:/, '')].reverse().join('')
     },
@@ -46,6 +52,8 @@ describe('unit: secureStore (DPAPI wrapper)', () => {
     state.available = true
     state.encryptionThrows = false
     state.decryptThrows = false
+    state.encryptCalls.length = 0
+    state.decryptCalls.length = 0
     if (fs.existsSync(credFile)) fs.unlinkSync(credFile)
     fs.writeFileSync(credFile, ENC_TEST)
   })
@@ -66,26 +74,41 @@ describe('unit: secureStore (DPAPI wrapper)', () => {
     expect(store.readApiKey()).toBe('sk-test-secret') // cache survives file removal
   })
 
-  it('encrypts before writing so the file never holds the plaintext key', async () => {
+  it('encrypts before writing and a fresh module can decrypt it back from disk', async () => {
     const store = await freshStore()
     store.writeApiKey('sk-new-secret')
-    const raw = fs.readFileSync(credFile).toString()
-    expect(raw).not.toContain('sk-new-secret')
-    expect(raw).toContain('enc:')
-    expect(store.readApiKey()).toBe('sk-new-secret')
+    // The OS encryption function must actually be called with the plaintext.
+    expect(state.encryptCalls).toContain('sk-new-secret')
+    const onDisk = fs.readFileSync(credFile)
+    expect(onDisk.toString()).not.toContain('sk-new-secret')
+    // Bytes on disk must be exactly what encryptString returned (not a
+    // plaintext fallback, not a differently-named file).
+    expect(onDisk.equals(Buffer.from('enc:' + [...state.encryptCalls[0]].reverse().join('')))).toBe(true)
+    state.decryptCalls.length = 0
+    // A brand-new module has no cache: this read MUST hit the filesystem and
+    // call decryptString to recover the original key.
+    const fresh = await freshStore()
+    expect(fresh.readApiKey()).toBe('sk-new-secret')
+    expect(state.decryptCalls.length).toBe(1)
   })
 
   it('refuses to persist in plaintext when OS encryption is unavailable', async () => {
     const store = await freshStore()
+    const before = fs.readFileSync(credFile)
     state.available = false
     expect(() => store.writeApiKey('sk-secret')).toThrow(/拒绝以明文保存/)
-    expect(fs.readFileSync(credFile).toString()).not.toContain('sk-secret')
+    // The file must be byte-for-byte untouched, and no encryption attempted.
+    expect(fs.readFileSync(credFile).equals(before)).toBe(true)
+    expect(state.encryptCalls).toHaveLength(0)
   })
 
   it('refuses to persist when isEncryptionAvailable itself throws', async () => {
     const store = await freshStore()
+    const before = fs.readFileSync(credFile)
     state.encryptionThrows = true
     expect(() => store.writeApiKey('sk-secret')).toThrow()
+    expect(fs.readFileSync(credFile).equals(before)).toBe(true)
+    expect(state.encryptCalls).toHaveLength(0)
   })
 
   it('clearStoredApiKey deletes the encrypted file; later reads yield null', async () => {
