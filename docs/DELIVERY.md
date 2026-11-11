@@ -27,7 +27,7 @@
 | 教学闭环 | 状态机 PREPARE→ATTEMPT→DIAGNOSE→CLARIFY/RETRY/EXPLAIN/PASS→COMPLETE（可选 TRANSFER）、L0–L3、上限策略、首次答案先入库、曝光归因 append-only、Validator、迁移题、学习档案 | 真实 |
 | 持久化 | sql.js WASM SQLite + append-only 事件；浏览器 localStorage 预览后端；重启恢复草稿/会话/作答/诊断/阅读位置 | 真实 |
 | 安全 | contextIsolation + sandbox、最小权限 IPC 白名单（已加入 5 个新配置方法）、文章纯文本渲染、日志不含凭据与作答 | 真实 |
-| 自动测试 | 89 项单元测试 + 51 项 Electron 端到端自检 | 真实 |
+| 自动测试 | 89 项单元测试 + 52 项 Electron 端到端自检 | 真实 |
 
 ### 未实现 / 未验证
 
@@ -89,7 +89,7 @@ npm run test                 # 89 项单元测试
 npm run generate:articles    # 重新生成 100 篇原创语料 + 3,605 句解析（确定性）
 npm run build:dictionary     # 用 .tmp/ecdict-source.csv 重新生成离线词库
 npm run build                # 主进程 + bundle preload + renderer
-npm run smoke                # Electron + SQLite + 加密凭据 + 词库/解析/骨架/交互/字号/文案自检（51 项）
+npm run smoke                # Electron + SQLite + 加密凭据 + 词库/解析/骨架/交互/字号/文案自检（52 项）
 npm start                    # 构建并启动 Windows 桌面应用（推荐）
 npm run dev:web              # 浏览器预览（密钥仅内存、可能受 CORS 限制）
 npm run dev:electron         # Vite 热更新 + Electron
@@ -109,7 +109,7 @@ npm run dev:electron         # Vite 热更新 + Electron
 | --- | --- |
 | `npx tsc --noEmit -p tsconfig.json` / `tsconfig.electron.json` | 通过，0 错误 |
 | `npm run test` | **9 文件 / 89 项全通过，0 失败 0 跳过**（约 4.2 s） |
-| `npm run smoke` | **51 项全通过（Electron 33.4.11，谓语为英文原句片段）**，证据 `scripts/smoke-result.json` |
+| `npm run smoke` | **52 项全通过（Electron 33.4.11，谓语为英文原句片段）**，证据 `scripts/smoke-result.json` |
 | `npm run build` | 成功；JS 2.32 MB（gzip 769 kB，含 100 篇语料 + 1.3 MB 词库 + 0.91 MB 逐句解析与英文主干）/ CSS 17.01 kB。单 bundle 是刻意选择：Electron `file://` 下动态 import 第二 chunk 会被 Chromium 模块 CORS 拦截 |
 
 单元测试分布：`segment.test.ts` 5、`validator.test.ts` 7、`machine.test.ts` 7、`benchmark.test.ts` 26、`runtime.test.ts` 13、`articleBank.test.ts` 7（含每篇 700–900 词断言与版本刷新）、`apiProvider.test.ts` 11、`dictionary.test.ts` 7（含点击位置取词的边界规则）、`explanations.test.ts` 6（全量逐句解析覆盖、英文片段、targets 不变、导入句回落）。
