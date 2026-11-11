@@ -22,8 +22,10 @@ app.whenReady().then(async () => {
     const { openDatabase, createSqliteStore } = require('../dist-electron/electron/db.js')
     const { createRuntime } = require('../dist-electron/src/core/runtime.js')
     const { LAB_API_METHODS } = require('../dist-electron/electron/apiMethods.js')
-    const db = openDatabase(path.join(USER_DATA, 'verify-middleclick.sqlite'))
-    const runtime = createRuntime({ store: createSqliteStore(db), backendKind: 'electron-sqlite' })
+    // openDatabase() is async and derives its path from app.getPath('userData');
+    // createSqliteStore() takes no arguments. (USER_DATA is set above.)
+    await openDatabase()
+    const runtime = createRuntime({ store: createSqliteStore(), backendKind: 'electron-sqlite' })
     ipcMain.handle('lab:invoke', async (_e, m, a) => {
       if (!LAB_API_METHODS.includes(m)) throw new Error('not allowed: ' + m)
       return runtime[m](...(a || []))
@@ -61,22 +63,47 @@ app.whenReady().then(async () => {
     if (!rect.found) { finish(new Error('no hittable point on sentence')); return }
     const pt = rect.found
 
-    // Sanity check: does a LEFT click at the same coordinates reach the element?
+    // Sanity check: a LEFT click at the same coordinates must reach the element.
     win.webContents.sendInputEvent({ type: 'mouseMove', x: pt.x, y: pt.y })
     win.webContents.sendInputEvent({ type: 'mouseDown', x: pt.x, y: pt.y, button: 'left', clickCount: 1 })
     win.webContents.sendInputEvent({ type: 'mouseUp', x: pt.x, y: pt.y, button: 'left', clickCount: 1 })
     await new Promise(r => setTimeout(r, 300))
     const left = await win.webContents.executeJavaScript(`window.__ev.join(',')`)
     say('AFTER_LEFT', left)
-    // Reset log, then middle click.
+    if (left.indexOf('mousedown|0') < 0) { finish(new Error('left click did not reach the sentence (bad coordinates)')); return }
+
+    // CRITICAL: a left click may have opened the word card. Both the word card
+    // and the action menu share the .sentence-menu class, so a leftover card
+    // would make a broken middle-click look like a pass. Dismiss all layers
+    // with Escape and assert the DOM is clean BEFORE the middle click.
+    // Dismiss overlays. Escape handling is a window keydown listener, so a DOM
+    // KeyboardEvent is sufficient here (this is cleanup, not the behavior
+    // under test). The middle-click itself still uses real sendInputEvent.
+    await win.webContents.executeJavaScript(`window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`)
+    await new Promise(r => setTimeout(r, 250))
+    const clean = await win.webContents.executeJavaScript(`document.querySelectorAll('.sentence-menu').length`)
+    say('DOM_BEFORE_MIDDLE', clean)
+    if (clean !== 0) { finish(new Error('stale .sentence-menu layer before middle click; cannot verify')); return }
     await win.webContents.executeJavaScript(`window.__ev=[]`)
+
     win.webContents.sendInputEvent({ type: 'mouseMove', x: pt.x, y: pt.y })
     win.webContents.sendInputEvent({ type: 'mouseDown', x: pt.x, y: pt.y, button: 'middle', clickCount: 1 })
     win.webContents.sendInputEvent({ type: 'mouseUp', x: pt.x, y: pt.y, button: 'middle', clickCount: 1 })
     await new Promise(r => setTimeout(r, 900))
 
-    const result = await win.webContents.executeJavaScript(`(function(){var m=document.querySelector('.sentence-menu');return {events:window.__ev,menu:!!m,text:m?m.innerText.slice(0,80):''}})()`)
+    // Only the three-choice action menu counts. Never use the shared
+    // .sentence-menu selector here.
+    const result = await win.webContents.executeJavaScript(`(function(){
+      var m=document.querySelector('.sentence-action-menu');
+      var t=m?m.innerText:'';
+      return {events:window.__ev, menu:!!m,
+        hasAllItems: t.indexOf('直接解析')>=0 && t.indexOf('推导训练')>=0 && t.indexOf('加入复测')>=0,
+        text:t.slice(0,80)};
+    })()`)
     say('RESULT', JSON.stringify(result))
+    const sawMiddleDown = result.events.some((e) => e === 'mousedown|1')
+    const ok = result.menu && result.hasAllItems && sawMiddleDown
+    if (!ok) { finish(new Error('middle-click menu did not open correctly: ' + JSON.stringify(result))); return }
     finish(null)
   } catch (e) { finish(e) }
 })
