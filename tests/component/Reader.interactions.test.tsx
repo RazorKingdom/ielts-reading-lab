@@ -47,6 +47,18 @@ function mouse(el: HTMLElement, type: string, button: number) {
   })
 }
 
+/** A real browser press emits a sequence, not a single event. This catches
+ * interactions where a later event in the sequence closes what an earlier one
+ * opened (e.g. the document-level mousedown dismisser). */
+function fullClick(el: HTMLElement, button: number) {
+  const opts = { bubbles: true, cancelable: true, button, clientX: 100, clientY: 100 }
+  act(() => {
+    el.dispatchEvent(new MouseEvent('mousedown', opts))
+    el.dispatchEvent(new MouseEvent('mouseup', opts))
+    el.dispatchEvent(new MouseEvent(button === 2 ? 'contextmenu' : button === 1 ? 'auxclick' : 'click', opts))
+  })
+}
+
 describe('component: Reader three-button interactions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -87,16 +99,33 @@ describe('component: Reader three-button interactions', () => {
     expect(apiMock.markAnalysisViewed).toHaveBeenCalledTimes(2) // exposure still recorded
   })
 
-  it('right-click popover survives a re-click on another sentence without stale meaning', async () => {
+  it('right-click loading state resolves to the meaning (no stuck spinner)', async () => {
     render(<Reader {...props()} />)
-    const el = sentenceEl()
-    mouse(el, 'contextmenu', 2)
+    mouse(sentenceEl(), 'contextmenu', 2)
     expect(screen.getByText('正在获取语义…')).toBeInTheDocument()
-
-    // A second article sentence would race; here resolve only one and verify
-    // the loading state is replaced (no stuck spinner).
     await waitFor(() => expect(screen.queryByText('正在获取语义…')).not.toBeInTheDocument())
     expect(screen.getByText(MEANING)).toBeInTheDocument()
+  })
+
+  it('a stale async response cannot overwrite a newer sentence meaning', async () => {
+    const TWO = 'First the samples were reweighted. Then the ranking was compared across sites.'
+    const twoArticle = createArticle({ id: 'two', title: 'Two', originalText: TWO })
+    const els: { resolve: (a: SentenceAnalysis) => void }[] = []
+    apiMock.getAnalysis.mockImplementation(() => new Promise((resolve) => {
+      els.push({ resolve })
+    }))
+    render(<Reader {...props()} article={twoArticle} />)
+    const sentences = document.querySelectorAll<HTMLElement>('[data-sid]')
+    expect(sentences.length).toBe(2)
+
+    // Right-click sentence A, then sentence B. Resolve B first, then A.
+    mouse(sentences[0], 'contextmenu', 2)
+    mouse(sentences[1], 'contextmenu', 2)
+    const bMeaning: SentenceAnalysis = { ...analysis, meaning: 'B 的译文：随后比较排名。' }
+    const aMeaning: SentenceAnalysis = { ...analysis, meaning: 'A 的译文：样本被重新加权。' }
+    await act(async () => { els[1].resolve(bMeaning); els[0].resolve(aMeaning) })
+    await waitFor(() => expect(screen.getByText('B 的译文：随后比较排名。')).toBeInTheDocument())
+    expect(screen.queryByText('A 的译文：样本被重新加权。')).not.toBeInTheDocument()
   })
 
   it('middle-click opens the three-choice menu; middle button on the sentence only', () => {
@@ -110,6 +139,21 @@ describe('component: Reader three-button interactions', () => {
     expect(screen.getByText('直接解析')).toBeInTheDocument()
     expect(screen.getByText('推导训练')).toBeInTheDocument()
     expect(screen.getByText('加入复测')).toBeInTheDocument()
+  })
+
+  it('a full real middle-click sequence keeps the menu open', () => {
+    render(<Reader {...props()} />)
+    // mousedown opens the menu; the following mouseup/auxclick and the
+    // document-level dismisser must NOT immediately close it.
+    fullClick(sentenceEl(), 1)
+    expect(screen.getByText('句子操作')).toBeInTheDocument()
+    expect(screen.getByText('直接解析')).toBeInTheDocument()
+  })
+
+  it('a full left-click sequence never opens the action menu', () => {
+    render(<Reader {...props()} />)
+    fullClick(sentenceEl(), 0)
+    expect(screen.queryByText('句子操作')).not.toBeInTheDocument()
   })
 
   it('middle-menu "直接解析" opens the sidebar and marks analysis viewed', async () => {
@@ -164,6 +208,13 @@ describe('component: Reader three-button interactions', () => {
     await waitFor(() => expect(apiMock.markAnalysisViewed).toHaveBeenCalledTimes(1))
     expect(screen.getByText('结构 / Structure')).toBeInTheDocument()
     expect(p.onToast).toHaveBeenCalledWith(expect.stringContaining('答案已暴露'))
+    expect(p.onToast).toHaveBeenCalledTimes(1)
+    // A second Enter must not repeat the warning.
+    act(() => {
+      sentenceEl().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    await waitFor(() => expect(apiMock.markAnalysisViewed).toHaveBeenCalledTimes(2))
+    expect(p.onToast).toHaveBeenCalledTimes(1)
   })
 
   it('left click clears a leftover drag selection so it never hijacks word picking', () => {
@@ -179,6 +230,27 @@ describe('component: Reader three-button interactions', () => {
 
     mouse(sentenceEl(), 'click', 0)
     expect(window.getSelection()?.toString() ?? '').toBe('')
+  })
+
+  it('a real caret hit opens the word tool, and Escape closes all three layers', async () => {
+    render(<Reader {...props()} />)
+    // setup.ts stubs caretRangeFromPoint to null by default, which means the
+    // whole word-picking success path was never executed. Provide a real Range.
+    const textNode = sentenceEl().firstChild!;
+    (document as unknown as { caretRangeFromPoint: () => Range }).caretRangeFromPoint = () => {
+      const r = document.createRange()
+      r.setStart(textNode, 0)
+      r.setEnd(textNode, 0)
+      return r
+    }
+    mouse(sentenceEl(), 'click', 0)
+    expect(document.querySelector('.word-tool')).not.toBeNull()
+
+    // Escape must close the word tool too (previously only 2 of 3 layers tested).
+    act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
+    expect(document.querySelector('.word-tool')).toBeNull()
+    expect(document.querySelector('.sentence-tool')).toBeNull()
+    expect(document.querySelector('.sentence-action-menu')).toBeNull()
   })
 
   it('left-click with no caret word closes popovers rather than opening a menu', () => {
