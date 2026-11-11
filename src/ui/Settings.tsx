@@ -90,10 +90,21 @@ export default function SettingsView({ settings, providers, hostInfo, onSettings
       setFeedback({ ok: false, text: '请先填写 Base URL 与模型名。' })
       return
     }
+    if (!costConfirmed) {
+      setFeedback({ ok: false, text: '请先勾选费用确认：测试连接会发出一次真实且可能计费的请求。' })
+      return
+    }
     setBusy('test')
     setFeedback(null)
     try {
-      await persistFields()
+      // Persist config fields, but NEVER the unsubmitted key draft: testing
+      // must not silently overwrite a saved key (P1-1).
+      const saved = await api.setApiConfig({ baseUrl: baseUrl.trim(), model: model.trim(), costConfirmed: true })
+      setConfig(saved)
+      if (!saved.hasKey) {
+        setFeedback({ ok: false, text: '请先点「保存配置」保存 API Key，再测试连接。' })
+        return
+      }
       const result = await api.testApiConnection()
       setFeedback({
         ok: result.ok,
@@ -117,7 +128,14 @@ export default function SettingsView({ settings, providers, hostInfo, onSettings
         setConfig(await api.setApiConfig({ enabled: false }))
         onToast('已停用第三方 API；应用不会再发起外部请求。')
       } else {
-        let c = await persistFields()
+        // Don't silently persist an unsaved key draft on enable (P1-1).
+        if (keyInput.trim()) {
+          setFeedback({ ok: false, text: '请先把填写的 API Key 点「保存配置」，再启用诊断。' })
+          return
+        }
+        let c = await api.setApiConfig({
+          baseUrl: baseUrl.trim(), model: model.trim(), costConfirmed,
+        })
         c = await api.setApiConfig({ enabled: true })
         setConfig(c)
         if (c.enabled) onToast('已启用第三方 API 诊断。')
@@ -298,10 +316,10 @@ export default function SettingsView({ settings, providers, hostInfo, onSettings
               </div>
               <div className="setting-row">
                 <div className="sr-main">
-                  <div className="sr-title">学习历史个性化</div>
-                  <div className="sr-desc">关闭后不再把历史观察附带到诊断上下文</div>
+                  <div className="sr-title">学习历史个性化 <Badge tone="purple">当前版本未启用</Badge></div>
+                  <div className="sr-desc">诊断当前只使用本句上下文，不会附带任何历史观察；此开关预留给后续版本，现为只读。</div>
                 </div>
-                <input type="checkbox" checked={settings.personalization} onChange={(e) => void onSettings({ personalization: e.target.checked })} />
+                <input type="checkbox" checked={false} disabled aria-label="学习历史个性化（当前版本未启用）" />
               </div>
               <div className="setting-row">
                 <div className="sr-main">
