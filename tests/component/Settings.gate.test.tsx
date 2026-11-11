@@ -45,8 +45,9 @@ function renderSettings() {
 describe('component: Settings API configuration gate', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    apiMock.getApiConfig.mockResolvedValue(cfg())
-    apiMock.setApiConfig.mockImplementation(async (patch) => ({ ...cfg(), ...patch }))
+    const initial = cfg()
+    apiMock.getApiConfig.mockResolvedValue(initial)
+    apiMock.setApiConfig.mockImplementation(async (patch) => ({ ...initial, ...patch }))
     apiMock.setApiKey.mockImplementation(async () => cfg({ hasKey: true }))
     apiMock.testApiConnection.mockResolvedValue({ ok: true, message: 'OK' })
   })
@@ -71,15 +72,31 @@ describe('component: Settings API configuration gate', () => {
     expect(saved.model).toBe('deepseek-test')
   })
 
-  it('test connection stays disabled until a model name is entered', async () => {
+  it('test connection requires model name and refuses without cost confirmation', async () => {
     renderSettings()
     await waitFor(() => expect(apiMock.getApiConfig).toHaveBeenCalled())
     const btn = screen.getByRole('button', { name: /测试连接/ })
-    expect(btn).toBeDisabled() // cost gate: no model => cannot send a paid request
-    const modelInput = document.querySelectorAll<HTMLInputElement>('input')[1]
-    fireEvent.change(modelInput, { target: { value: 'test-model' } })
+    expect(btn).toBeDisabled() // no model => cannot send a paid request
+    fireEvent.change(document.querySelectorAll<HTMLInputElement>('input')[1], { target: { value: 'test-model' } })
     expect(btn).not.toBeDisabled()
+
+    // Cost confirmation is unchecked: UI blocks before any request is sent.
     act(() => { btn.click() })
+    await waitFor(() => expect(screen.getAllByText(/勾选费用确认/).length).toBeGreaterThan(0))
+    expect(apiMock.testApiConnection).not.toHaveBeenCalled()
+    expect(apiMock.setApiKey).not.toHaveBeenCalled() // no silent key draft save
+  })
+
+  it('testing never silently persists an unsaved API key draft', async () => {
+    const withKey = cfg({ hasKey: true, costConfirmed: true, model: 'm' })
+    apiMock.getApiConfig.mockResolvedValue(withKey)
+    apiMock.setApiConfig.mockImplementation(async (patch) => ({ ...withKey, ...patch }))
+    renderSettings()
+    await waitFor(() => expect(apiMock.getApiConfig).toHaveBeenCalled())
+    const keyInput = document.querySelectorAll<HTMLInputElement>('input')[2]
+    fireEvent.change(keyInput, { target: { value: 'sk-draft-should-not-be-saved' } })
+    act(() => { screen.getByRole('button', { name: /测试连接/ }).click() })
     await waitFor(() => expect(apiMock.testApiConnection).toHaveBeenCalledTimes(1))
+    expect(apiMock.setApiKey).not.toHaveBeenCalled()
   })
 })
