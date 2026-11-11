@@ -55,13 +55,15 @@ npm run test:all    # 上面两条连跑
 
 | 断言 | 在哪测 | 为什么 |
 |---|---|---|
-| 右键弹出语义悬浮窗、显示译文 | `tests/component/Reader.interactions.test.tsx` 真实派发 `contextmenu` | 静态字符串只能证明文案进了 bundle |
-| **右键不调用 `markAnalysisViewed`**（不破坏无提示训练归因） | 同上，`expect(apiMock.markAnalysisViewed).not.toHaveBeenCalled()` | 这是核心业务不变量 |
-| 中键 `button===1` 才弹三选菜单 | 同上，派发 `auxclick` 并先测 `button=0` 不弹 | `onClick` 只响应左键，中键必须走 `onAuxClick` |
+| 右键弹出语义悬浮窗、显示译文，**并标记答案已暴露** | `tests/component/Reader.interactions.test.tsx` 派发 `contextmenu`，断言 `markAnalysisViewed` 调用 1 次 | 右键语义与 L3 参考理解同源，必须计入曝光 |
+| 右键同句二次查看走缓存，不重复请求 | 同上，断言 `getAnalysis` 只调用 1 次 | requestId 竞态守卫 + 缓存 |
+| 中键 `button===1` 才弹三选菜单 | 同上，派发 `mousedown`（`button=0` 不弹、`button=1` 弹） | **真实 Chromium 中键走 `onMouseDown`，不是 `onAuxClick`** |
 | 三个菜单项分别触发解析 / 训练 / 复测 | 同上，逐项 click 后断言 API 调用 | 行为级验证 |
-| 打包产物含新交互文案 | `scripts/smoke-electron.cjs` 字符串哨兵 | 防止构建漏打包，不是行为测试 |
+| **真实中键按下能弹出三选菜单** | `npm run verify:middleclick`（`webContents.sendInputEvent`） | 组件层是 jsdom 合成事件，不能证明真机可用；见 §7 |
+| 打包产物含新交互文案 | `scripts/smoke-electron.cjs` 字符串哨兵 | 仅防构建漏打包，不是行为测试 |
 
 **不要把组件测试降级成字符串检查，也不要在 smoke 里重复搭复杂 UI 导航。**
+**涉及非左键 / 拖选 / 滚轮的交互，jsdom 组件测试只能证明 React 逻辑层，必须配合 `verify:middleclick` 之类的真实输入验证。**
 
 ## 4. 每次改动的回归流程
 
@@ -93,9 +95,11 @@ npm run test:all    # 上面两条连跑
 
 ## 5. 当前覆盖统计（2026-11-11）
 
-- Vitest 总计：**179 项**（根目录历史测试 89 + unit 45 + integration 16 + component 15 + regression 14）
+- Vitest 总计：**183 项**（根目录历史测试 89 + unit 45 + integration 16 + component 19 + regression 14）
+  - 注：根目录 89 项里有 20 项由 `benchmark.test.ts` 顶层循环动态生成，静态数 `it(` 会少算。用 `vitest --reporter=json` 统计才准确。
 - Electron smoke：**52 项**
-- 真实鼠标输入验证：`npm run verify:middleclick`（见 §7）
+- 真实鼠标输入验证：`npm run verify:middleclick`（见 §7），已纳入 `npm run test:all`
+- `npm run test:all` = vitest → smoke → 真机中键验证；三个入口都经过 `scripts/ensure-build.cjs` 的**产物新鲜度检查**（源码比 dist 新则自动重建），避免测到旧 bundle。
 - 均未使用覆盖率工具；缺口由上文"四层总览"与代码评审确定。
 
 ## 7. 真实输入验证：不要只信 jsdom 的合成事件（重要教训）
@@ -109,15 +113,21 @@ npm run test:all    # 上面两条连跑
 ```bash
 npm run verify:middleclick
 # 用 Electron 的 webContents.sendInputEvent 在真实渲染进程里派发 middle
-# mousedown/mouseup，检查 .sentence-menu 是否出现。结果写入
-# scripts/verify-middleclick-result.json，menu:true 才算通过。
+# mousedown/mouseup，检查 .sentence-action-menu 是否出现、是否含三个菜单项、
+# 事件序列里是否有 mousedown|1。结果写入
+# scripts/verify-middleclick-result.json。
 ```
 
-它发现了真实 bug：中键菜单原来绑在 `onAuxClick`，而真实中键在下层被 autoscroll 处理，`auxclick` 不稳定触发。现已改为 `onMouseDown` 监听 `e.button === 1` 并 `preventDefault()` 阻止自动滚动。每次改 Reader 交互后应跑此脚本，再跑 smoke。
+它发现了真实 bug：中键菜单原来绑在 `onAuxClick`，而真实中键在下层被 autoscroll 处理，`auxclick` 不稳定触发。现已改为 `onMouseDown` 监听 `e.button === 1` 并 `preventDefault()` 阻止自动滚动。
+
+**验证工具自身也会假阳性（第二次教训）**：第一版脚本用 `querySelector('.sentence-menu')` 判定，而左键词卡与中键菜单共用这个 class；脚本又先派发了左键，中键完全失效时残留词卡仍会让 `menu:true`。现已改为：中键前用 Escape 清空 DOM 并断言 `.sentence-menu` 数量为 0；只认 `.sentence-action-menu`；检查菜单文本含三项与 `events` 含 `mousedown|1`；launcher 每次删除旧结果文件，条件不全即非零退出。
+
+**因此新增强制要求：任何回归验证脚本上线前，必须做一次反向验证**——故意破坏被测逻辑，确认脚本 FAIL，再恢复确认 PASS。本次已对中键验证执行过（破坏后 `menu:false` → FAILED）。每次改 Reader 交互后应跑此脚本，再跑 smoke。
 
 ## 6. 已知不测的内容（诚实边界）
 
 - **真实模型诊断质量**：没有真实 API Key 的成功输出，无法做误判率/证据准确率评测（见 `DELIVERY.md` §8）。
 - **真人 GUI 视觉验收**：自动化不截图比对像素；字号用 DOM 计算值验证，布局美观需人工看。
-- **其他 UI 组件**（Library / Profile / Focus）：目前只有 smoke 的渲染启动检查，无组件级行为测试。
+- **其他 UI 组件**：`Library` 只在 smoke 里随默认视图渲染、无任何断言；`Profile` / `Focus` / `App` / `ErrorBoundary` / `kit` 在自动化测试里**从未被渲染**。Settings 也只覆盖 4 条路径，`handleToggle` / `handleDelete` 等零覆盖。这是当前最大的覆盖缺口。
+- **主进程真实 IPC handler**：smoke 自己注册 `ipcMain.handle`，不加载 `dist-electron/electron/main.js`，窗口安全策略与真实 handler 零覆盖。
 - **performance / 长时间运行**：未做压力或内存泄漏测试。
