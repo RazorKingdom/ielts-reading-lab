@@ -1,0 +1,294 @@
+{
+  "specVersion": "1.0.0",
+  "generatedAt": "2026-11-11",
+  "purpose": "IELTS Reading Lab 当前代码的机器可读规格摘要",
+  "sourceOfTruth": {
+    "principle": "以代码为准；代码与文档冲突时代码优先。本文件由源码、脚本运行结果与现行文档交叉核对生成。",
+    "primaryFiles": [
+      "package.json",
+      "src/core/types.ts",
+      "src/core/runtime.ts",
+      "src/core/machine.ts",
+      "src/core/validator.ts",
+      "src/core/targets.ts",
+      "src/store/browserStore.ts",
+      "electron/db.ts",
+      "electron/apiMethods.ts",
+      "electron/main.ts",
+      "electron/preload.ts",
+      "src/App.tsx",
+      "src/ui/Reader.tsx",
+      "src/ui/WrongWords.tsx",
+      "docs/*.md"
+    ],
+    "knownDocDrift": [
+      "docs/CONTRACT.md §6 写「9 条对抗样本」，src/core/samples.ts 实际为 10 条（A01–A10）",
+      "docs/ARCHITECTURE.md §3.2 仍写 onSentenceAuxClick，代码已改为 onSentenceMouseDown（真实中键不派发 auxclick）",
+      "README.md 与 docs/ARCHITECTURE.md 的「89 项单测 + 52 项自检」已过期，当前为 202 项 Vitest + 54 项 smoke",
+      "docs/CONTRACT.md §8 的覆盖统计仍是早期阶段，docs/TESTING.md §5 才是当前统计"
+    ]
+  },
+
+  "project": {
+    "name": "IELTS Reading Lab",
+    "packageName": "ielts-reading-lab",
+    "packageVersion": "1.0.0",
+    "desktopRelease": "v8",
+    "description": "离线可用的 IELTS 学术长难句阅读训练桌面应用：100 篇原创文章、逐句中文参考理解、离线查词、中文自由表达诊断、L0–L3 渐进反馈，可选接入 OpenAI 兼容第三方 API。",
+    "appType": "Electron 桌面应用（同时提供浏览器预览后端）",
+    "platform": "Windows x64",
+    "license": "MIT（项目本体）；ECDICT 派生词库 MIT，见 third_party/ECDICT-LICENSE.txt",
+    "git": {
+      "remote": "https://github.com/RazorKingdom/ielts-reading-lab",
+      "branch": "main",
+      "head": "059b7aa",
+      "localEqualsRemote": true,
+      "pushMethod": "标准 git push（历史已于 2026-11-11 用 merge -s ours 对齐，不再需要 API 逐文件同步）"
+    }
+  },
+
+  "product": {
+    "corePrinciples": [
+      "沉浸阅读是默认状态，训练是可选进入的精读模式；打开解析不等于技能不足",
+      "用户用自己的中文自然表达理解，不要求语法术语；缺少术语不得判为不懂",
+      "合理简化、意译、非标准但正确的表达不得判错",
+      "先提示再揭示完整答案，用户可随时停止或解锁 L3",
+      "训练结果必须注明提示暴露条件，判断可追溯、可质疑",
+      "首次答案在任何诊断请求之前落库且不可覆盖，API 失败不丢答案"
+    ],
+    "views": [
+      { "key": "library", "label": "文章库", "component": "src/ui/Library.tsx" },
+      { "key": "reader", "label": "阅读工作台", "component": "src/ui/Reader.tsx" },
+      { "key": "focus", "label": "训练中心", "component": "src/ui/Focus.tsx" },
+      { "key": "profile", "label": "学习档案", "component": "src/ui/Profile.tsx" },
+      { "key": "wrongwords", "label": "错词本", "component": "src/ui/WrongWords.tsx" },
+      { "key": "settings", "label": "设置", "component": "src/ui/Settings.tsx" }
+    ],
+    "readerInteractions": {
+      "leftClick": "caret 取词（或拖拽划选短语）→ 离线词义卡：音标、中文释义、考试标签、词形还原、相近词；卡底部「添加错词本」",
+      "rightClick": "句子语义悬浮窗（扇贝式），语义与 L3 参考理解同源，因此写入「答案已暴露」标记",
+      "middleClick": "在 mousedown（button===1）弹三选菜单：直接解析 / 推导训练 / 加入复测；必须 preventDefault 阻止 Chromium autoscroll",
+      "keyboard": "Enter / Space 打开完整解析并事先提示曝光；Esc 关闭全部浮层",
+      "implementationNote": "真实 Chromium 的中键 autoscroll 会吞掉 auxclick，禁止回退到 onAuxClick"
+    },
+    "offlineFirst": "默认零网络、零费用：阅读、查词、解析、错词本、训练反馈均可离线运行；仅在用户显式启用第三方 API 后才产生计费请求"
+  },
+
+  "architecture": {
+    "layers": [
+      { "name": "Renderer", "tech": "React 18 + TypeScript", "entry": "src/main.tsx → src/App.tsx", "constraints": "无 Node / 无 fs / 无密钥，只通过 window.labAPI 调用" },
+      { "name": "Preload", "file": "electron/preload.ts", "role": "contextBridge 暴露 labAPI / labHost；sandbox 兼容，esbuild 打成单文件" },
+      { "name": "Main", "file": "electron/main.ts", "role": "BrowserWindow、IPC 白名单分发、注入 providerFactory；密钥只在主进程解密" },
+      { "name": "Core", "path": "src/core/*", "role": "LabStore / LabAPI 接口与 createRuntime 编排；machine / validator / targets / diagnose / exercise" },
+      { "name": "Storage", "files": ["electron/db.ts", "src/store/browserStore.ts", "electron/secureStore.ts"] }
+    ],
+    "ipc": {
+      "channel": "lab:invoke",
+      "whitelistFile": "electron/apiMethods.ts",
+      "whitelistCount": 29,
+      "rule": "主进程校验 method ∈ LAB_API_METHODS，否则拒绝"
+    },
+    "security": {
+      "contextIsolation": true,
+      "nodeIntegration": false,
+      "sandbox": true,
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' + 本地 dev server",
+      "credentials": "safeStorage / DPAPI 加密 api-credential.bin；renderer 只见 hasKey 布尔值；SQLite records 与导出 JSON 均无明文密钥；浏览器预览只在内存中保存",
+      "articles": "一律作为不可信纯文本渲染，prompt 中声明为 data，不执行其中指令"
+    },
+    "backends": {
+      "electron": { "store": "sql.js WASM SQLite", "dbPath": "%APPDATA%\\ielts-reading-lab\\reading-lab.sqlite", "kind": "electron-sqlite" },
+      "browserPreview": { "store": "localStorage (ielts-reading-lab:v1)", "kind": "browser-localstorage", "note": "仅预览，与桌面数据不互通，密钥刷新即失" }
+    },
+    "sqlite": {
+      "schema": "records(seq INTEGER PK AUTOINCREMENT, kind TEXT, id TEXT, payload TEXT, UNIQUE(kind,id))",
+      "kinds": ["article", "session", "attempt", "diagnosis", "feedback", "decision", "observation", "review", "mark", "exposure", "position", "settings", "api-config", "wrongWord"],
+      "writeMode": "事件类 append-only（INSERT OR IGNORE）；配置类按 id 覆盖（INSERT OR REPLACE）",
+      "export": "exportData() 导出 records 全表，不含密钥"
+    }
+  },
+
+  "techStack": {
+    "runtime": { "electron": "^33.2.0", "node": "20.x", "react": "^18.3.1", "react-dom": "^18.3.1", "sql.js": "^1.13.0" },
+    "tooling": { "typescript": "^5.7.2", "vite": "^5.4.11", "vitest": "^2.1.8", "esbuild": "^0.21.5", "electron-builder": "^26.18.0", "jsdom": "^31.0.0" },
+    "testingLibs": ["@testing-library/react", "@testing-library/jest-dom", "@testing-library/user-event"]
+  },
+
+  "dataModel": {
+    "definitionFile": "src/core/types.ts",
+    "coreEntities": ["Article", "Sentence", "Paragraph", "SentenceAnalysis", "DiagnosticTarget", "TargetEvidence", "RawDiagnosis", "Diagnosis", "Attempt", "FeedbackEvent", "TeachingDecision", "TrainingSession", "SessionSnapshot", "TransferTemplate", "TransferResult", "SkillObservation", "ReviewTask", "MarkedSentence", "WrongWord", "Profile", "ProfileStats", "ThirdPartyConfig", "AppSettings", "ProviderCapability"],
+    "sentenceIdFormat": "{articleId}:{versionHash前8位}:p{段号}:s{句号}:{fnv1a(text)}",
+    "enums": {
+      "sessionStates": ["PREPARE", "ATTEMPT", "DIAGNOSE", "CLARIFY", "RETRY", "EXPLAIN", "PASS", "TRANSFER", "COMPLETE", "DIAGNOSE_FAILED"],
+      "teachingActions": ["PASS", "CLARIFY", "RETRY", "EXPLAIN", "TRANSFER"],
+      "trainingIntents": ["SET_DRAFT", "SUBMIT", "REQUEST_HINT", "UNLOCK_LEVEL3", "ACCEPT_TRANSFER", "SKIP_TRANSFER", "SUBMIT_TRANSFER", "DISPUTE", "RETRY_DIAGNOSIS", "EXIT"],
+      "verdicts": ["correct", "incorrect", "partial", "insufficient", "disputed"],
+      "feedbackLevels": [0, 1, 2, 3],
+      "observationResults": ["independent-correct", "assisted-correct", "partial", "incorrect", "insufficient", "disputed", "unscored"],
+      "targetWeights": ["core", "important", "minor"]
+    },
+    "wrongWord": {
+      "fields": ["id", "word", "query", "phonetic?", "translation", "tags", "base?", "found", "note?", "sentenceText?", "articleId?", "createdAt"],
+      "dedupKey": "词条原形（lemma）小写；ran / run / RUN 归并为同一条",
+      "snapshot": "加入时保存离线词典释义快照与来源句子，点击时优先重新查词、快照兜底"
+    }
+  },
+
+  "api": {
+    "interface": "LabAPI（定义与实现均在 src/core/runtime.ts）",
+    "methodCount": 29,
+    "methods": [
+      "bootstrap", "listProviders", "createArticle", "deleteArticle", "getArticle",
+      "getReadingPosition", "saveReadingPosition", "getAnalysis", "markAnalysisViewed", "hasAnalysisBeenViewed",
+      "findActiveSession", "startSession", "resumeSession", "dispatch", "getProfile",
+      "addMark", "updateMark", "updateReviewTask", "listWrongWords", "addWrongWord", "removeWrongWord",
+      "setSettings", "getApiConfig", "setApiConfig", "setApiKey", "clearApiKey", "testApiConnection",
+      "exportData", "deleteAllData"
+    ],
+    "storeInterface": "LabStore（listArticles/getArticle/putArticle/…/listWrongWords/addWrongWord/removeWrongWord/getApiKey/setApiKey/exportAll/clearAll）"
+  },
+
+  "teachingPolicy": {
+    "policyVersion": "policy-0.1.0",
+    "policyFile": "src/core/machine.ts",
+    "limits": { "maxAutoClarify": 1, "maxReExpression": 1, "maxTransfer": 1, "maxAttempts": 2 },
+    "decisionOwner": "模型只输出 evidences 与 suggestedAction；machine.decide() 在应用侧做最终裁决，否决时写 policyNote",
+    "levels": {
+      "L0": "仅原句 + 自由输入，可计独立正确",
+      "L1": "指出已理解与问题范围，已暴露，不计独立",
+      "L2": "局部线索 / 对比句，已暴露，不计独立",
+      "L3": "完整主干、逐层结构、参考理解；禁用独立正确归因；到顶后无更深提示"
+    },
+    "validatorHardRules": [
+      "targetId 必须来自本次分析",
+      "originalSpan 必须是原句逐字子串",
+      "answerQuote 必须是作答逐字子串",
+      "判 incorrect 必须带逐字证据，否则拒绝整个诊断"
+    ],
+    "exposureAndAttribution": [
+      "右键语义悬浮窗、中键「直接解析」、UNLOCK_LEVEL3、REQUEST_HINT 到 L3 均写 append-only 曝光记录（key = articleId|sentenceId）",
+      "directAnalysisSeen=true 时 startSession 同步置 answerRevealed=true / currentLevel=3，避免徽章自相矛盾",
+      "曝光后 PASS 的 notice 不再声称保持独立测评，反馈等级用真实 currentLevel",
+      "UNLOCK_LEVEL3 只把原 independent-correct 修正为 assisted-correct，保留 incorrect / insufficient",
+      "TRANSFER 不提供 L3 入口（避免作答前泄漏迁移答案）；曝光后迁移判 unscored 且不排复测",
+      "统计以最新曝光条件为准，旧行保留可追溯"
+    ],
+    "failureHandling": "Provider 失败 → DIAGNOSE_FAILED + 持久化 lastErrorNote + 按错误类别给指引；RETRY_DIAGNOSIS 不重复写 session；DISPUTE 要求已有诊断",
+    "benchmark": {
+      "file": "src/core/samples.ts + tests/benchmark.test.ts",
+      "manualCases": 12,
+      "caseIds": "D01–D12（原创 IELTS 风格句，非官方真题）",
+      "adversarialCases": 10,
+      "adversarialIds": "A01–A10（同义中文、非标准表达、代词歧义、『不知道』不得判错）",
+      "note": "仅验证本地规则自洽，不能外推为真实模型诊断质量"
+    }
+  },
+
+  "content": {
+    "articleBank": {
+      "file": "src/core/articleBank.ts",
+      "count": 100,
+      "version": 2,
+      "composition": "3 篇手写重点文 + 97 篇确定性模板合成学术文本",
+      "length": "每篇 700–900 词",
+      "rights": "本项目原创 IELTS 风格练习文本，非官方真题，不复制受版权保护原文",
+      "bootstrapRule": "空库注入；sampleBankVersion ≠ 2 时覆盖已存在内置文章内容但保留 createdAt，删除过的内置文章不复活"
+    },
+    "dictionary": {
+      "file": "src/data/dictionary.ts",
+      "rows": 11828,
+      "source": "ECDICT (MIT) 派生，scripts/build-dictionary.mjs 生成",
+      "api": "lookupWord() / extractWordAt() / normalizeQuery()",
+      "features": ["词形还原（不规则表 + 后缀规则 + exchange lemma）", "考试标签中文化", "未收录如实提示并给相近词", "点击位置取词"]
+    },
+    "offlineExplanations": {
+      "file": "src/data/explanations.ts",
+      "rows": 3605,
+      "fields": ["sentenceId", "中文参考理解", "类别", "英文主语", "谓语", "宾语/表语"],
+      "usage": "analysisWithOffline() 只覆盖 meaning/layers/followUps/skeleton，targets/chunks/phrases 保持不变"
+    }
+  },
+
+  "providers": {
+    "userFacing": "只保留一张「第三方 API（OpenAI 兼容）」卡片",
+    "protocol": "POST {baseUrl}/chat/completions，解析 JSON / markdown 诊断结果",
+    "enableGates": ["hasKey", "enabled", "costConfirmed", "model 非空", "baseUrl 非空"],
+    "costGate": "testApiConnection 必须先勾选费用确认；测试连接 / 启用不得静默保存未提交保存的 Key 草稿",
+    "credential": "setApiKey 写入加密主机存储，永不回传明文；getApiConfig 仅返回 hasKey",
+    "offlineFallback": "闸门不满足时用内部离线规则兜底，不展示为可选模型、不冒充模型输出",
+    "settingsReadOnly": "学习历史个性化开关当前 core 未读取，UI 标注为只读",
+    "realModelStatus": "未验证：真实 Key 链路已实测，但目标端点 moyuu.cc 由 Cloudflare 返回 HTTP 503（鉴权前），未拿到任何模型输出；诊断质量与结构化兼容性待换可用端点重测",
+    "siwc": "官方 Sign in with ChatGPT 路线已按需求移除；阶段 0 真人授权 POC 结论 BLOCKED，见 docs/POC-RESULT.md（历史记录，不代表当前架构）"
+  },
+
+  "features": {
+    "wrongWordNotebook": {
+      "entry": "左键词义卡底部「添加错词本」按钮；已在错词本时按钮禁用并显示「已在错词本」",
+      "collect": "api.addWrongWord({query, sentenceText?, articleId?}) 保存词典快照与来源句；空输入拒绝；lemma 去重",
+      "display": "侧边栏「错词本」→ 双竖排列表（按序前半 / 后半分列）+ 关键字筛选；窄屏自动单栏",
+      "detail": "点击单词在右侧卡片显示词义、音标、标签、词形还原、来源句、收录日期，并可移除",
+      "persistence": "browserStore 与 SqliteStore 双实现；exportData 包含，deleteAllData 清空",
+      "verifiedBy": "npm run verify:wrongwords（真实 Electron 输入 + IPC + SQLite 全链路）"
+    }
+  },
+
+  "buildAndRelease": {
+    "keyScripts": {
+      "build": "npm run build:electron && vite build",
+      "typecheck": "tsc --noEmit -p tsconfig.json",
+      "test": "vitest run",
+      "test:all": "vitest run && npm run smoke && npm run verify:middleclick && npm run verify:wrongwords",
+      "package": "npm run build && node scripts/package-app.cjs",
+      "dev:electron": "构建主进程 + Vite dev server + Electron"
+    },
+    "outputs": {
+      "dist": "Vite 前端产物",
+      "dist-electron": "编译后的主进程 / preload / core",
+      "release": "release/IELTS Reading Lab v8/IELTS Reading Lab.exe（便携版，约 180 MiB）"
+    },
+    "freshnessGuard": "scripts/ensure-build.cjs：源码比 dist 新则自动重建，接入 smoke / verify:* / test:all，避免测到旧 bundle",
+    "launcher": "C:\\Users\\Razor\\Desktop\\IELTS Reading Lab.cmd（清除 ELECTRON_RUN_AS_NODE 后启动 v8 exe）",
+    "launcherCaveat": "该 .cmd 已被外部清理过五次；消失时可直接双击 release 内 exe 或重建该 5 行脚本",
+    "electronBuilder": { "appId": "com.ieltsreadinglab.app", "targets": ["nsis", "zip"], "arch": "x64" }
+  },
+
+  "verification": {
+    "vitest": { "total": 202, "files": 24, "groups": { "root": 89, "unit": 45, "integration": 16, "component": 25, "regression": 27 } },
+    "smoke": { "checks": 54, "script": "scripts/smoke-electron.cjs", "scope": "真实 Electron + sql.js SQLite + preload sandbox + 打包文案与白名单" },
+    "realInputChecks": [
+      { "command": "npm run verify:middleclick", "asserts": "真实 sendInputEvent 中键 → .sentence-action-menu 与三项菜单 + mousedown|1" },
+      { "command": "npm run verify:wrongwords", "asserts": "真实左键 → 词卡 → 添加按钮 → IPC/SQLite → 错词本双列 → 点击显示词义" }
+    ],
+    "methodology": [
+      "jsdom 合成事件会绕过浏览器原生路径（autoscroll、caret API），非左键/拖选交互必须用真实 Electron 输入验证",
+      "任何回归脚本或验证工具上线前必须反向验证：故意破坏逻辑应 FAIL，恢复应 PASS",
+      "两项真机脚本均已通过反向验证"
+    ],
+    "uncovered": [
+      "Profile / Focus / App / Library / ErrorBoundary / kit 无组件级行为测试；Settings 高危按钮零覆盖",
+      "主进程真实 IPC handler 与窗口安全策略零覆盖（smoke 自行注册 handler）",
+      "真实模型诊断质量、误判率、证据准确率未验证（端点 503）",
+      "真人 GUI 视觉验收、R03/R04/R06/R07 交互截图与 E2E 黄金路径缺失",
+      "原计划 30 句 × 3 回答 ≈ 90 条基准与双人标注未达成",
+      "性能、长时间运行、内存泄漏未测"
+    ]
+  },
+
+  "knownStructuralGaps": [
+    "availableIntents 仅作 UI 提示，dispatch 入口未做白名单校验",
+    "提示等级与意图表解耦，靠 computeIntents 中各状态的显式分支维护",
+    "Focus 草稿 650ms 防抖写 SET_DRAFT 可能覆盖刚返回的 notice / policyNote",
+    "QUOTA_EXCEEDED 改完配置返回后仍不显示重试按钮，可能需「重新开始本句」"
+  ],
+
+  "docs": [
+    { "file": "README.md", "role": "项目总览与文档入口" },
+    { "file": "docs/USER-GUIDE.md", "role": "最终用户：安装、启动、阅读/训练/查词/错词本/设置/备份" },
+    { "file": "docs/ONBOARDING.md", "role": "接手开发者：文档地图、模块索引、改动场景、红线" },
+    { "file": "docs/ARCHITECTURE.md", "role": "分层、数据流、不变量、持久化结构" },
+    { "file": "docs/CONTRACT.md", "role": "教学契约、证据规则、L0–L3、裁决策略、人工基准" },
+    { "file": "docs/DELIVERY.md", "role": "交付范围、真实 API 实测记录与未验证项" },
+    { "file": "docs/TESTING.md", "role": "四层测试体系、真机验证、假阳性教训、诚实边界" },
+    { "file": "docs/POC-RESULT.md", "role": "阶段 0 SIWC 历史核查（BLOCKED，不代表当前架构）" }
+  ]
+}
