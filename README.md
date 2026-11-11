@@ -55,7 +55,7 @@ npm start            # 构建并启动桌面应用
 ```bash
 npm run smoke        # Electron + SQLite / 加密凭据端到端自检（52 项）
 npm run dev:web      # 纯浏览器预览（localStorage，不互通，仅看界面）
-npm run package      # 构建并组装免命令行的便携版到 release/IELTS Reading Lab v6/
+npm run package      # 构建并组装免命令行的便携版到 release/IELTS Reading Lab v7/
 ```
 
 `npm run package` 用 `scripts/package-app.cjs` 直接组装（复制 Electron 运行时 + 把应用放在 `resources/app/` 真实目录），不依赖 electron-builder 的临时目录重命名，便于在受限环境打包。`npm run dist` 是 electron-builder 标准路径，普通 Windows 环境可用。
