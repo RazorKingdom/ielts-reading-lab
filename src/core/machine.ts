@@ -89,7 +89,13 @@ export function decide(input: DecideInput): Decision {
   } else {
     action = 'PASS'
     reasonCodes.push('core-understanding-correct')
-    if (suggestedAction && suggestedAction !== 'PASS' && suggestedAction !== 'TRANSFER') {
+    if (answerRevealed) {
+      // Still a correct core, but the learner has already seen the answer:
+      // never describe this round as an independent assessment.
+      reasonCodes.push('answer-already-revealed')
+      policyNote = '答案已暴露，本轮判定通过但不计入独立测评。'
+    }
+    if (suggestedAction && suggestedAction !== 'PASS' && suggestedAction !== 'TRANSFER' && !policyNote) {
       policyNote = '核心理解已正确，应用拒绝模型提出的额外追问。'
     }
   }
