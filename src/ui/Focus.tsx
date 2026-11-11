@@ -101,8 +101,8 @@ export default function Focus({ sessionId, showModelMeta, onReturn, onRestart, o
       <div className="focus-top">
         <button className="btn ghost sm" onClick={onReturn}><Icon name="back" size={14} /> 返回阅读</button>
         <span className="title" style={{ fontWeight: 620, fontSize: 13 }}>引导训练</span>
-        <Badge tone={s.answerRevealed ? 'orange' : 'green'}>
-          Level {s.currentLevel}{s.answerRevealed ? ' · 答案已暴露' : ''}
+        <Badge tone={s.answerRevealed || s.directAnalysisSeen ? 'orange' : 'green'}>
+          Level {s.currentLevel}{s.answerRevealed || s.directAnalysisSeen ? ' · 答案已暴露' : ''}
         </Badge>
         {s.directAnalysisSeen && <Badge tone="orange">进入前已看解析</Badge>}
         {s.disputed && <Badge tone="purple">有争议 / 待复核</Badge>}
@@ -281,10 +281,10 @@ export default function Focus({ sessionId, showModelMeta, onReturn, onRestart, o
                 <div className="attempt-row" key={a.id}>
                   <span className="seq">#{a.sequence} · {timeLabel(a.submittedAt)}</span>
                   <span style={{ flex: 1 }}>{a.userText}</span>
-                  <Badge tone={a.exposureSnapshot.answerRevealed ? 'orange' : 'green'}>
-                    L{a.exposureSnapshot.level}{a.exposureSnapshot.answerRevealed ? ' 已暴露' : ' 独立'}
+                  <Badge tone={a.exposureSnapshot.answerRevealed || a.exposureSnapshot.directAnalysisSeen ? 'orange' : 'green'}>
+                    L{a.exposureSnapshot.level}{a.exposureSnapshot.answerRevealed || a.exposureSnapshot.directAnalysisSeen ? ' 已暴露' : ' 独立'}
                   </Badge>
-                  {a.exposureSnapshot.directAnalysisSeen && <Badge tone="orange">已看解析</Badge>}
+                  {a.exposureSnapshot.directAnalysisSeen && <Badge tone="orange">进入前已看解析</Badge>}
                 </div>
               ))}
             </div>
@@ -314,7 +314,7 @@ export default function Focus({ sessionId, showModelMeta, onReturn, onRestart, o
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {can('REQUEST_HINT') && (
                 <button className="btn" disabled={busy} onClick={() => void send({ type: 'REQUEST_HINT' })}>
-                  <Icon name="spark" size={14} /> 给一点更具体的提示（L{s.currentLevel + 1}）
+                  <Icon name="spark" size={14} /> 给一点更具体的提示（L{Math.min(3, s.currentLevel + 1)}）
                 </button>
               )}
               {can('UNLOCK_LEVEL3') && !s.answerRevealed && (
