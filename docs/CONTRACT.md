@@ -41,7 +41,7 @@ Validator 强制：`targetId` 必须来自本次分析、`originalSpan` 必须�
 - 用户可随时请求更深入提示或直接解锁 L3；解锁后原句不再计为独立测评。
 - 明确错误可以直接纠正，不为防剧透而制造无意义猜谜。
 - 每次暴露（打开解析、解锁 L3、二次作答）都写 append-only 曝光记录；统计以**最新曝光条件**为准，旧行保留可追溯。
-- 关键：右键打开「直接解析」即写入曝光标记（`articleId|sentenceId`），训练时带 `directAnalysisSeen`。
+- 关键：右键语义悬浮窗与中键「直接解析」都会写入曝光标记（`articleId|sentenceId`），训练时带 `directAnalysisSeen`。右键展示的语义与 L3 参考理解同源，因此同样计为已暴露。
 
 ## 4. 教学决策与上限
 
