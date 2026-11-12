@@ -32,6 +32,7 @@ coverage/
 scripts/smoke-result.json
 scripts/verify-middleclick-result.json
 scripts/verify-wrongwords-result.json
+scripts/verify-mcp-result.json
 .probe-userdata/
 .verify-ww-userdata/
 .smoke-userdata/

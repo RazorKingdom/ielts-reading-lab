@@ -26,9 +26,10 @@
     "test:integration": "vitest run tests/integration",
     "test:component": "vitest run tests/component",
     "test:regression": "vitest run tests/regression",
-    "test:all": "vitest run && npm run smoke && npm run verify:middleclick && npm run verify:wrongwords",
+    "test:all": "vitest run && npm run verify:mcp && npm run smoke && npm run verify:middleclick && npm run verify:wrongwords",
     "verify:middleclick": "node scripts/run-verify-middleclick.cjs",
-    "verify:wrongwords": "node scripts/run-verify-wrongwords.cjs"
+    "verify:wrongwords": "node scripts/run-verify-wrongwords.cjs",
+    "verify:mcp": "node scripts/run-verify-mcp.cjs"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -36,6 +37,7 @@
     "sql.js": "^1.13.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.9",

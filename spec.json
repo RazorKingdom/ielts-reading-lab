@@ -41,7 +41,8 @@
     "git": {
       "remote": "https://github.com/RazorKingdom/ielts-reading-lab",
       "branch": "main",
-      "head": "059b7aa",
+      "head": "10c4b73",
+      "headNote": "生成 spec 时的 HEAD 快照，每次提交后用 MCP 工具 get_git_status 查询当前值",
       "localEqualsRemote": true,
       "pushMethod": "标准 git push（历史已于 2026-11-11 用 merge -s ours 对齐，不再需要 API 逐文件同步）"
     }
@@ -110,7 +111,7 @@
 
   "techStack": {
     "runtime": { "electron": "^33.2.0", "node": "20.x", "react": "^18.3.1", "react-dom": "^18.3.1", "sql.js": "^1.13.0" },
-    "tooling": { "typescript": "^5.7.2", "vite": "^5.4.11", "vitest": "^2.1.8", "esbuild": "^0.21.5", "electron-builder": "^26.18.0", "jsdom": "^31.0.0" },
+    "tooling": { "typescript": "^5.7.2", "vite": "^5.4.11", "vitest": "^2.1.8", "esbuild": "^0.21.5", "electron-builder": "^26.18.0", "jsdom": "^31.0.0", "@modelcontextprotocol/sdk": "^1.32.2" },
     "testingLibs": ["@testing-library/react", "@testing-library/jest-dom", "@testing-library/user-event"]
   },
 
@@ -232,12 +233,26 @@
     }
   },
 
+  "integrations": {
+    "mcp": {
+      "server": "scripts/mcp-server.cjs（stdio，@modelcontextprotocol/sdk 1.32.2）",
+      "clientConfig": "~/.workbuddy/mcp.json 的 mcpServers['ielts-reading-lab']；需在连接器管理页点「信任」并重启 WorkBuddy",
+      "tools": 18,
+      "categories": ["只读运行时数据（8 个，用 sql.js 从 Buffer 打开真实 SQLite，绝不写回）", "项目/规格（3 个）", "白名单 npm 命令（7 个，固定脚本、独立超时、输出截断）"],
+      "safety": "不暴露 deleteAllData / 任意 shell / 写 DB / setApiKey；export_snapshot 的 saveTo 只取 basename，强制落在 .tmp/；stdout 只走 JSON-RPC",
+      "verify": "npm run verify:mcp（19 项真实握手断言）+ tests/unit/mcp-tools.test.ts（4 项定义护栏）",
+      "notImplemented": "写操作（如 add_wrong_word）需主进程提供 127.0.0.1 受控 HTTP 接口，由应用自身 runtime 写库；当前版本纯只读",
+      "doc": "docs/MCP.md"
+    }
+  },
+
   "buildAndRelease": {
     "keyScripts": {
       "build": "npm run build:electron && vite build",
       "typecheck": "tsc --noEmit -p tsconfig.json",
       "test": "vitest run",
-      "test:all": "vitest run && npm run smoke && npm run verify:middleclick && npm run verify:wrongwords",
+      "test:all": "vitest run && npm run verify:mcp && npm run smoke && npm run verify:middleclick && npm run verify:wrongwords",
+      "verify:mcp": "node scripts/run-verify-mcp.cjs",
       "package": "npm run build && node scripts/package-app.cjs",
       "dev:electron": "构建主进程 + Vite dev server + Electron"
     },
@@ -247,22 +262,23 @@
       "release": "release/IELTS Reading Lab v9/IELTS Reading Lab.exe（便携版，约 180 MiB）"
     },
     "freshnessGuard": "scripts/ensure-build.cjs：源码比 dist 新则自动重建，接入 smoke / verify:* / test:all，避免测到旧 bundle",
-    "launcher": "C:\\Users\\Razor\\Desktop\\IELTS Reading Lab.cmd（清除 ELECTRON_RUN_AS_NODE 后启动 v8 exe）",
-    "launcherCaveat": "该 .cmd 已被外部清理过五次；消失时可直接双击 release 内 exe 或重建该 5 行脚本",
+    "launcher": "C:\\Users\\Razor\\Desktop\\IELTS Reading Lab.cmd（清除 ELECTRON_RUN_AS_NODE 后启动 v9 exe）",
+    "launcherCaveat": "该 .cmd 已被外部清理过六次；消失时可直接双击 release 内 exe 或重建该 5 行脚本",
     "electronBuilder": { "appId": "com.ieltsreadinglab.app", "targets": ["nsis", "zip"], "arch": "x64" }
   },
 
   "verification": {
-    "vitest": { "total": 203, "files": 24, "groups": { "root": 89, "unit": 45, "integration": 16, "component": 26, "regression": 27 } },
+    "vitest": { "total": 207, "files": 25, "groups": { "root": 89, "unit": 49, "integration": 16, "component": 26, "regression": 27 } },
     "smoke": { "checks": 54, "script": "scripts/smoke-electron.cjs", "scope": "真实 Electron + sql.js SQLite + preload sandbox + 打包文案与白名单" },
     "realInputChecks": [
+      { "command": "npm run verify:mcp", "asserts": "真实 MCP stdio 握手 → tools/list 与 11 个只读工具 → 真实 SQLite 数据 → 路径穿越被拦 → 未知工具被拒（19 项）" },
       { "command": "npm run verify:middleclick", "asserts": "真实 sendInputEvent 中键 → .sentence-action-menu 与三项菜单 + mousedown|1" },
       { "command": "npm run verify:wrongwords", "asserts": "真实左键 → 词卡 → 添加按钮 → IPC/SQLite → 错词本双列 → 点击显示词义" }
     ],
     "methodology": [
       "jsdom 合成事件会绕过浏览器原生路径（autoscroll、caret API），非左键/拖选交互必须用真实 Electron 输入验证",
       "任何回归脚本或验证工具上线前必须反向验证：故意破坏逻辑应 FAIL，恢复应 PASS",
-      "两项真机脚本均已通过反向验证"
+      "两项真机脚本均已通过反向验证；verify:mcp 用未知工具拒绝、路径穿越拦截等负向断言守卫边界"
     ],
     "uncovered": [
       "Profile / Focus / App / Library / ErrorBoundary / kit 无组件级行为测试；Settings 高危按钮零覆盖",
@@ -289,6 +305,7 @@
     { "file": "docs/CONTRACT.md", "role": "教学契约、证据规则、L0–L3、裁决策略、人工基准" },
     { "file": "docs/DELIVERY.md", "role": "交付范围、真实 API 实测记录与未验证项" },
     { "file": "docs/TESTING.md", "role": "四层测试体系、真机验证、假阳性教训、诚实边界" },
+    { "file": "docs/MCP.md", "role": "MCP server：工具清单、启用步骤、安全边界、故障排查" },
     { "file": "docs/POC-RESULT.md", "role": "阶段 0 SIWC 历史核查（BLOCKED，不代表当前架构）" }
   ]
 }

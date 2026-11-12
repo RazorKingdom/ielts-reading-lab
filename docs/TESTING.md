@@ -95,11 +95,12 @@ npm run test:all    # 上面两条连跑
 
 ## 5. 当前覆盖统计（2026-11-11）
 
-- Vitest 总计：**203 项**（根目录历史测试 89 + unit 45 + integration 16 + component 26 + regression 27）
+- Vitest 总计：**207 项**（根目录历史测试 89 + unit 49 + integration 16 + component 26 + regression 27）
   - 注：根目录 89 项里有 20 项由 `benchmark.test.ts` 顶层循环动态生成，静态数 `it(` 会少算。用 `vitest --reporter=json` 统计才准确。
 - Electron smoke：**54 项**（含错词本导航/双列/词义文案与 API 白名单哨兵）
-- 真实输入验证：`npm run verify:middleclick`、`npm run verify:wrongwords`（见 §7），均已纳入 `npm run test:all`
-- `npm run test:all` = vitest → smoke → 真机中键验证 → 真机错词本验证；三个入口都经过 `scripts/ensure-build.cjs` 的**产物新鲜度检查**（源码比 dist 新则自动重建），避免测到旧 bundle。
+- 真实协议验证：`npm run verify:mcp`（**19 项**，真实 MCP stdio 握手，见 §7）
+- 真实输入验证：`npm run verify:middleclick`、`npm run verify:wrongwords`（见 §7）
+- 以上四项均已纳入 `npm run test:all` = vitest → MCP 握手 → smoke → 真机中键验证 → 真机错词本验证。smoke 与两个真机入口都经过 `scripts/ensure-build.cjs` 的**产物新鲜度检查**（源码比 dist 新则自动重建），避免测到旧 bundle；`verify:mcp` 直接读源码与数据库，不需要构建。
 - 均未使用覆盖率工具；缺口由上文"四层总览"与代码评审确定。
 
 ## 7. 真实输入验证：不要只信 jsdom 的合成事件（重要教训）
@@ -136,6 +137,18 @@ npm run verify:wrongwords
 
 已做反向验证：把按钮 `onClick` 改成空函数后，`STORED []` → FAILED；恢复后 PASS。组件测试（`tests/component/WrongWords.test.tsx`）与真实 runtime 回归（`tests/regression/wrong-words.test.ts`）分别覆盖双列渲染/点击词义/移除/筛选，以及词形归并去重、重启持久化、删除、清空与导出。
 
+### MCP server 协议验证
+
+```
+npm run verify:mcp
+# 用官方 SDK 起真实 stdio 客户端，连 scripts/mcp-server.cjs：
+# tools/list 有 18 个工具且描述/输入 schema 齐全 → 逐个调用 11 个只读工具
+# （读真实 %APPDATA%\ielts-reading-lab\reading-lab.sqlite）→ check_spec_consistency
+# → export_snapshot 的路径穿越被拦 → 未知工具被拒。结果写 verify-mcp-result.json。
+```
+
+19 项断言，全部走真实进程与真实数据，没有 mock。`tests/unit/mcp-tools.test.ts` 另锁住工具数量、描述完整性、命令白名单只引用真实 npm scripts、以及「不出现 deleteAllData / 任意 shell / 写 DB」这条安全红线。详见 `docs/MCP.md`。
+
 ## 6. 已知不测的内容（诚实边界）
 
 - **真实模型诊断质量**：没有真实 API Key 的成功输出，无法做误判率/证据准确率评测（见 `DELIVERY.md` §8）。
@@ -143,3 +156,4 @@ npm run verify:wrongwords
 - **其他 UI 组件**：`Library` 只在 smoke 里随默认视图渲染、无任何断言；`Profile` / `Focus` / `App` / `ErrorBoundary` / `kit` 在自动化测试里**从未被渲染**。Settings 也只覆盖 4 条路径，`handleToggle` / `handleDelete` 等零覆盖。这是当前最大的覆盖缺口。
 - **主进程真实 IPC handler**：smoke 自己注册 `ipcMain.handle`，不加载 `dist-electron/electron/main.js`，窗口安全策略与真实 handler 零覆盖。
 - **performance / 长时间运行**：未做压力或内存泄漏测试。
+- **MCP 命令工具**：`verify:mcp` 只验证工具定义、只读工具与负向断言，未实跑 `run_test_all` / `package_app` 等长耗时命令（它们由 `test:all` 与打包流程间接覆盖）；MCP **写操作当前未实现**，见 `docs/MCP.md` §8。
