@@ -10,7 +10,7 @@ const path = require('path')
 const fs = require('fs')
 
 const ROOT = path.resolve(__dirname, '..')
-const OUT = path.join(ROOT, 'release', 'IELTS Reading Lab v9')
+const OUT = path.join(ROOT, 'release', 'IELTS Reading Lab v10')
 const ELECTRON_DIST = path.join(ROOT, 'node_modules', 'electron', 'dist')
 const APP = path.join(OUT, 'resources', 'app')
 const EXE_NAME = 'IELTS Reading Lab.exe'

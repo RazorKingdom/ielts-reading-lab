@@ -95,7 +95,7 @@ npm run test:all    # 上面两条连跑
 
 ## 5. 当前覆盖统计（2026-11-11）
 
-- Vitest 总计：**207 项**（根目录历史测试 89 + unit 49 + integration 16 + component 26 + regression 27）
+- Vitest 总计：**213 项**（根目录历史测试 95 + unit 49 + integration 16 + component 26 + regression 27）
   - 注：根目录 89 项里有 20 项由 `benchmark.test.ts` 顶层循环动态生成，静态数 `it(` 会少算。用 `vitest --reporter=json` 统计才准确。
 - Electron smoke：**54 项**（含错词本导航/双列/词义文案与 API 白名单哨兵）
 - 真实协议验证：`npm run verify:mcp`（**19 项**，真实 MCP stdio 握手，见 §7）
@@ -148,6 +148,15 @@ npm run verify:mcp
 ```
 
 19 项断言，全部走真实进程与真实数据，没有 mock。`tests/unit/mcp-tools.test.ts` 另锁住工具数量、描述完整性、命令白名单只引用真实 npm scripts、以及「不出现 deleteAllData / 任意 shell / 写 DB」这条安全红线。详见 `docs/MCP.md`。
+
+### 诊断提示词 / validator 契约
+
+`tests/apiProvider.test.ts` 的 `prompt/validator contract` 分组守住两条曾导致真实诊断必然失败的规则冲突：
+
+- 旧 prompt 只要求 `incorrect` 带 `answerQuote`，但 validator 要求 `correct` / `partial` 也必须带非空逐字引用 → 合规于 prompt 的输出被整单拒绝。
+- 旧 prompt 只要求 `originalSpan` 是原句逐字子串，validator 还要求它与该目标的区间对应 → 同样被拒。
+
+现有测试分别断言「按修复后 prompt 写的输出同时通过 parser 与 validator」「旧形状仍被 validator 拒绝（不许靠放松校验来凑通过）」「SYSTEM_PROMPT 保留两条硬约束」「prompt 不下发完整参考译文」「请求体带 `max_tokens`」「启用但凭据不可用时 notice 明确说明是离线规则」。已做反向验证：临时删掉两条 prompt 规则 → 1 条测试 FAIL，恢复 → 17 项全过。
 
 ## 6. 已知不测的内容（诚实边界）
 

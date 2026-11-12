@@ -27,7 +27,6 @@ import { analysisWithOffline } from './explanations'
 import { createArticle } from './segment'
 import { createSampleArticles, ARTICLE_BANK_VERSION } from './samples'
 import { createProvider, ProviderError, providerErrorMessage } from './diagnose'
-import type { ErrorKind } from './diagnose'
 import { THIRD_PARTY_CAPABILITY } from './apiProvider'
 import { validateDiagnosis } from './validator'
 import { canSubmit, decide, isUnknownAnswer, observationResult, POLICY_LIMITS } from './machine'
@@ -384,6 +383,9 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
   async function runDiagnosis(s: TrainingSession, attempt: Attempt): Promise<SessionSnapshot> {
     const analysis = await analysisFor(s)
     const provider = await resolveProvider()
+    // A missing/unreadable credential used to silently fall back to local rules
+    // while the UI still showed "third-party API enabled". Make that visible.
+    const degraded = provider.id !== 'third-party-api' && (await store.getApiConfig()).enabled
     let raw: RawDiagnosis | null = null
     try {
       // Only a COMPLETE response is allowed to become a diagnosis. A rejected /
@@ -413,7 +415,9 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
     if (!validation.valid) {
       s.state = 'DIAGNOSE_FAILED'
       s.lastError = raw?.evidences?.length ? 'EVIDENCE_INSUFFICIENT' : 'INVALID_STRUCTURE'
-      s.lastErrorNote = providerErrorMessage(s.lastError as ErrorKind)
+      // Persist the ACTUAL validator complaints; a generic "evidence
+      // insufficient" note hides prompt/format mismatches after a restart.
+      s.lastErrorNote = `Validator 拒绝：${validation.issues.slice(0, 3).join('；')}`
       await store.putSession(s)
       return snapshot(
         s,
@@ -512,7 +516,10 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
 
     await store.putSession(s)
     await writeObservations(s, diagnosis, attempt)
-    return snapshot(s, notice, decisionOutcome.policyNote)
+    const finalNotice = degraded
+      ? `${notice ?? ''}（本次未调用第三方 API：加密凭据不可用或费用闸门未满足，诊断由本地离线规则生成。）`
+      : notice
+    return snapshot(s, finalNotice, decisionOutcome.policyNote)
   }
 
   /* ------------------------------ API impl ------------------------------ */

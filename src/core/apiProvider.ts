@@ -66,19 +66,27 @@ Return ONLY a JSON object, no markdown fences and no prose:
 Rules:
 - Your output is evidence and a SUGGESTION, never an application command. The application decides the teaching action.
 - Only an explicit conflict with the source sentence may be labelled "incorrect", and it MUST cite a verbatim quote from the learner's answer in "answerQuote".
+- EVERY evidence whose status is "correct", "partial" or "incorrect" MUST carry a NON-EMPTY "answerQuote" that is a verbatim substring of the learner's answer. Copy the exact characters: do not paraphrase, translate, add punctuation, or add quotation marks. ONLY "insufficient" and "disputed" may use an empty "answerQuote".
 - A reasonable paraphrase, a simplified but correct reading, or a lack of grammar terminology is NEVER an error.
 - If the learner did not express an item, use "insufficient" with an empty "answerQuote"; do not infer a mistake.
 - Ambiguous reference or multiple plausible readings must be "disputed", not "incorrect".
-- "originalSpan" must be copied verbatim from the given sentence; "answerQuote" must be copied verbatim from the given answer.
-- Every target id in "evidences" must come from the supplied targets. Include one evidence per supplied target.
+- "originalSpan" MUST be copied from the "originalSpan" field of THAT SAME target in the supplied targets (or a verbatim substring of it). Do not pick an arbitrary phrase from the sentence and do not reuse another target's span.
+- "answerQuote" must be copied verbatim from the given learner answer.
+- Every target id in "evidences" must come from the supplied targets. Include exactly one evidence per supplied target, with no duplicate target ids.
+- "summary" must be a SHORT judgement of the learner's answer, NOT a full reference translation of the sentence.
 - Do not claim a learner has "mastered" anything. Keep the current feedback level in mind: at level 0/1 do not reveal a full reference translation.`
 
 const VALID_VERDICTS: Verdict[] = ['correct', 'incorrect', 'partial', 'insufficient', 'disputed']
 const VALID_ACTIONS: TeachingAction[] = ['PASS', 'CLARIFY', 'RETRY', 'EXPLAIN', 'TRANSFER']
+/** Caps the diagnosis reply so a verbose model cannot truncate the JSON mid-object. */
+export const DIAGNOSIS_MAX_TOKENS = 1500
 
 export function buildDiagnosisMessages(req: DiagnosisRequest): { role: string; content: string }[] {
   const payload = {
     task: 'diagnose one learner answer against one English sentence',
+    // Never send analysis.meaning (the full reference translation): a model
+    // can echo it back in "summary", which level1Content shows at L1 and would
+    // break progressive disclosure. Per-target expectedMeaning is enough.
     targets: req.analysis.targets.map((t) => ({
       id: t.id,
       category: t.category,
@@ -86,7 +94,6 @@ export function buildDiagnosisMessages(req: DiagnosisRequest): { role: string; c
       expectedMeaning: t.expectedMeaning,
       weight: t.weight,
     })),
-    referenceMeaningForInternalUseOnly: req.analysis.meaning,
     contextBefore: req.contextBefore,
     contextAfter: req.contextAfter,
     learnerAnswer: req.attemptText,
@@ -194,6 +201,9 @@ export function classifyHttpError(status: number): ErrorKind {
 
 /** Never include the response body verbatim in an error: it may echo secrets. */
 function safeHttpMessage(status: number): string {
+  if (status === 404) return '第三方 API 返回 HTTP 404：端点路径不存在，请检查 Base URL（通常需以 /v1 结尾）。'
+  if (status === 400) return '第三方 API 返回 HTTP 400：请求被拒绝，请检查模型名与请求参数。'
+  if (status === 422) return '第三方 API 返回 HTTP 422：请求参数不被接受，请检查模型名。'
   return `第三方 API 返回 HTTP ${status}。`
 }
 
@@ -280,7 +290,7 @@ export class OpenAICompatibleProvider implements AIProvider {
   }
 
   async diagnose(req: DiagnosisRequest): Promise<RawDiagnosis> {
-    const content = await this.call(buildDiagnosisMessages(req))
+    const content = await this.call(buildDiagnosisMessages(req), DIAGNOSIS_MAX_TOKENS)
     return parseDiagnosisResponse(content, {
       allowedTargetIds: req.analysis.targets.map((t) => t.id),
       sentence: req.sentenceText ?? req.analysis.chunks.map((c) => c.text).join(' '),

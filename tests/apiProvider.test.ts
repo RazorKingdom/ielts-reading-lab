@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest'
 import type { AIProvider, DiagnosisRequest, RawDiagnosis } from '../src/core/types'
 import { analyzeSentence } from '../src/core/targets'
 import { createProvider, ProviderError } from '../src/core/diagnose'
+import { validateDiagnosis } from '../src/core/validator'
+import { createRuntime } from '../src/core/runtime'
+import { createBrowserStore, createMemoryStorage } from '../src/store/browserStore'
 import {
   buildDiagnosisMessages,
   classifyHttpError,
+  DIAGNOSIS_MAX_TOKENS,
   extractJsonObject,
   OpenAICompatibleProvider,
   parseDiagnosisResponse,
@@ -74,6 +78,28 @@ describe('OpenAI-compatible request construction', () => {
     expect(Array.isArray(payload.targets)).toBe(true)
     // Credentials are never part of the prompt.
     expect(messages[1].content).not.toMatch(/sk-|Bearer|apiKey/i)
+  })
+
+  it('requires verbatim quotes and per-target spans, and never ships the full translation', () => {
+    const messages = buildDiagnosisMessages(request())
+    const system = messages[0].content
+    expect(system).toMatch(/NON-EMPTY "answerQuote"/)
+    expect(system).toMatch(/do not paraphrase, translate, add punctuation/)
+    expect(system).toMatch(/THAT SAME target/)
+    expect(system).toMatch(/NOT a full reference translation/)
+    // The full reference translation must not be handed to the model: it can
+    // echo it back in "summary", which L1 feedback shows the learner.
+    expect(messages[1].content).not.toContain('referenceMeaningForInternalUseOnly')
+  })
+
+  it('caps the diagnosis reply so a verbose model cannot truncate the JSON', async () => {
+    const { impl, calls } = captureFetch(JSON.stringify(validRaw()))
+    const provider = new OpenAICompatibleProvider({
+      baseUrl: 'https://example.test/v1', model: 'm', apiKey: 'sk-x', fetchImpl: impl,
+    })
+    await provider.diagnose(request())
+    const body = JSON.parse(calls[0].init.body) as Record<string, unknown>
+    expect(body.max_tokens).toBe(DIAGNOSIS_MAX_TOKENS)
   })
 
   it('sends a bearer request to /chat/completions with the configured model', async () => {
@@ -264,5 +290,71 @@ describe('billing gate and credential handling in the runtime', () => {
     expect(r.attempts).toHaveLength(1)
     expect(r.attempts[0].userText).toBe(ANSWER)
     expect(r.diagnosis).toBeUndefined()
+  })
+})
+
+describe('prompt/validator contract (the two P0 mismatches)', () => {
+  const base = {
+    allowedTargetIds: ANALYSIS.targets.map((t) => t.id), sentence: D01, answer: ANSWER,
+  }
+  function modelReply(quote: string) {
+    return {
+      evidences: ANALYSIS.targets.map((t) => ({
+        targetId: t.id,
+        status: 'correct',
+        originalSpan: t.originalSpan,
+        answerQuote: quote,
+        rationale: '学习者表述与原文一致。',
+        suggestedAction: 'PASS',
+      })),
+      summary: '核心关系理解正确。',
+      suggestedAction: 'PASS',
+    }
+  }
+
+  it('a reply following the fixed prompt survives BOTH parser and validator', () => {
+    const raw = parseDiagnosisResponse(JSON.stringify(modelReply('程度取决于')), base)
+    const validation = validateDiagnosis(raw, ANALYSIS, D01, ANSWER)
+    expect(validation.valid).toBe(true)
+    expect(validation.issues).toEqual([])
+  })
+
+  it('validator still rejects the pre-fix shape, so the fix stays in the prompt', () => {
+    // The parser alone accepts an empty quote on "correct" - that mismatch is
+    // exactly why the prompt must forbid it. Do not "fix" this by loosening
+    // the validator.
+    const raw = parseDiagnosisResponse(JSON.stringify(modelReply('')), base)
+    expect(raw.evidences).toHaveLength(ANALYSIS.targets.length)
+    const validation = validateDiagnosis(raw, ANALYSIS, D01, ANSWER)
+    expect(validation.valid).toBe(false)
+    expect(validation.issues.join('；')).toMatch(/必须附用户回答证据/)
+  })
+
+  it('an arbitrary sentence fragment is rejected as an unrelated span', () => {
+    const loose = modelReply('程度取决于')
+    loose.evidences[0].originalSpan = 'technology'
+    const raw = parseDiagnosisResponse(JSON.stringify(loose), base)
+    const validation = validateDiagnosis(raw, ANALYSIS, D01, ANSWER)
+    expect(validation.valid).toBe(false)
+    expect(validation.issues.join('；')).toMatch(/目标区间不对应/)
+  })
+})
+
+describe('no silent fallback when the API is enabled but unusable', () => {
+  it('tells the learner that local rules, not the model, produced the diagnosis', async () => {
+    const store = createBrowserStore(createMemoryStorage())
+    // Write straight to the store: the public setApiConfig gate would refuse
+    // enabled=true without a key, but a stale/invalid credential can still
+    // leave this state behind in a real database.
+    await store.setApiConfig({ enabled: true, costConfirmed: true, model: 'm', baseUrl: 'https://x.test/v1' })
+    const api = createRuntime({ store, backendKind: 'browser-localstorage' })
+    await api.bootstrap()
+    expect((await api.getApiConfig()).hasKey).toBe(false)
+
+    const { session } = await api.startSession(makeSessionInput(D01))
+    const r = await api.dispatch(session.id, { type: 'SUBMIT', text: ANSWER })
+    expect(r.diagnosis?.providerId).not.toBe('third-party-api')
+    expect(r.notice).toMatch(/未调用第三方 API/)
+    expect(r.notice).toMatch(/离线规则/)
   })
 })

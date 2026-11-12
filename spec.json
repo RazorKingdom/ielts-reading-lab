@@ -33,7 +33,7 @@
     "name": "IELTS Reading Lab",
     "packageName": "ielts-reading-lab",
     "packageVersion": "1.0.0",
-    "desktopRelease": "v9",
+    "desktopRelease": "v10",
     "description": "离线可用的 IELTS 学术长难句阅读训练桌面应用：100 篇原创文章、逐句中文参考理解、离线查词、中文自由表达诊断、L0–L3 渐进反馈，可选接入 OpenAI 兼容第三方 API。",
     "appType": "Electron 桌面应用（同时提供浏览器预览后端）",
     "platform": "Windows x64",
@@ -259,16 +259,16 @@
     "outputs": {
       "dist": "Vite 前端产物",
       "dist-electron": "编译后的主进程 / preload / core",
-      "release": "release/IELTS Reading Lab v9/IELTS Reading Lab.exe（便携版，约 180 MiB）"
+      "release": "release/IELTS Reading Lab v10/IELTS Reading Lab.exe（便携版，约 180 MiB）"
     },
     "freshnessGuard": "scripts/ensure-build.cjs：源码比 dist 新则自动重建，接入 smoke / verify:* / test:all，避免测到旧 bundle",
-    "launcher": "C:\\Users\\Razor\\Desktop\\IELTS Reading Lab.cmd（清除 ELECTRON_RUN_AS_NODE 后启动 v9 exe）",
-    "launcherCaveat": "该 .cmd 已被外部清理过六次；消失时可直接双击 release 内 exe 或重建该 5 行脚本",
+    "launcher": "C:\\Users\\Razor\\Desktop\\IELTS Reading Lab.cmd（清除 ELECTRON_RUN_AS_NODE 后启动 v10 exe）",
+    "launcherCaveat": "该 .cmd 已被外部清理过七次；消失时可直接双击 release 内 exe 或重建该 5 行脚本",
     "electronBuilder": { "appId": "com.ieltsreadinglab.app", "targets": ["nsis", "zip"], "arch": "x64" }
   },
 
   "verification": {
-    "vitest": { "total": 207, "files": 25, "groups": { "root": 89, "unit": 49, "integration": 16, "component": 26, "regression": 27 } },
+    "vitest": { "total": 213, "files": 25, "groups": { "root": 95, "unit": 49, "integration": 16, "component": 26, "regression": 27 } },
     "smoke": { "checks": 54, "script": "scripts/smoke-electron.cjs", "scope": "真实 Electron + sql.js SQLite + preload sandbox + 打包文案与白名单" },
     "realInputChecks": [
       { "command": "npm run verify:mcp", "asserts": "真实 MCP stdio 握手 → tools/list 与 11 个只读工具 → 真实 SQLite 数据 → 路径穿越被拦 → 未知工具被拒（19 项）" },
