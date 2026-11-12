@@ -480,7 +480,11 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
       notice = '已进入完整解析；本句不再计为独立测评。'
     } else if (action === 'PASS') {
       s.state = 'PASS'
-      const exposed = s.answerRevealed || s.directAnalysisSeen || s.currentLevel > 0
+      const sawAnswer = s.answerRevealed || s.directAnalysisSeen
+      // A hint at L1/L2 already disqualifies "independent", but it is NOT the
+      // same as having seen the answer. decide() only marks exposure when
+      // answerRevealed is true, so the wording must distinguish the two.
+      const exposed = sawAnswer || s.currentLevel > 0
       // Feedback level must reflect what the learner actually saw; a green
       // "Level 0" row next to "答案已暴露" was contradictory (E3).
       await addFeedback(
@@ -488,11 +492,11 @@ export function createRuntime(options: RuntimeOptions): LabAPI {
         s.currentLevel,
         'pass',
         exposed
-          ? `${diagnosis.summary} 核心理解正确；本轮已看过答案，按「提示后」归因，不计独立测评。`
+          ? `${diagnosis.summary} 核心理解正确；本轮${sawAnswer ? '已看过答案' : '用过提示'}，按「提示后」归因，不计独立测评。`
           : `${diagnosis.summary} 本层不展示解析，以保持独立测评条件。`,
       )
       notice = exposed
-        ? '核心理解正确，但本轮已看过答案，不计独立测评；可继续做迁移题或结束本轮。'
+        ? `核心理解正确，但本轮${sawAnswer ? '已看过答案' : '用过提示'}，不计独立测评；可继续做迁移题或结束本轮。`
         : '核心理解正确，本句判定通过；不展示解析以保持独立测评，可继续做迁移题或结束本轮。'
     } else if (action === 'CLARIFY') {
       s.state = 'CLARIFY'

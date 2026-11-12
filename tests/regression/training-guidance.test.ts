@@ -47,6 +47,23 @@ describe('regression: exposure and teaching decisions agree', () => {
     expect(snap.decisions.at(-1)?.reasonCodes).toContain('answer-already-revealed')
   })
 
+  it('PASS after only an L1 hint says "used a hint", not "saw the answer"', async () => {
+    const { api, id } = await started()
+    await api.dispatch(id, { type: 'SUBMIT', text: WRONG }) // RETRY, level 1, not revealed
+    const snap = await api.dispatch(id, { type: 'SUBMIT', text: CORRECT })
+    expect(snap.session.state).toBe('PASS')
+    expect(snap.session.answerRevealed).toBe(false)
+    expect(snap.session.currentLevel).toBe(1)
+    // decide() does not mark exposure here, so the copy must not claim otherwise.
+    expect(snap.decisions.at(-1)?.reasonCodes).not.toContain('answer-already-revealed')
+    expect(snap.notice).not.toContain('已看过答案')
+    expect(snap.notice).toContain('用过提示')
+    expect(snap.notice).toContain('不计独立测评')
+    const pass = snap.feedback.filter((f) => f.kind === 'pass').at(-1)
+    expect(pass?.content).not.toContain('已看过答案')
+    expect(pass?.content).toContain('用过提示')
+  })
+
   it('「不知道」 persists an EXPLAIN decision, not CLARIFY', async () => {
     const { api, id } = await started()
     const snap = await api.dispatch(id, { type: 'SUBMIT', text: '不知道。' })

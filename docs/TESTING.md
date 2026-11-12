@@ -95,7 +95,7 @@ npm run test:all    # 上面两条连跑
 
 ## 5. 当前覆盖统计（2026-11-11）
 
-- Vitest 总计：**213 项**（根目录历史测试 95 + unit 49 + integration 16 + component 26 + regression 27）
+- Vitest 总计：**214 项**（根目录历史测试 95 + unit 49 + integration 16 + component 26 + regression 28）
   - 注：根目录 89 项里有 20 项由 `benchmark.test.ts` 顶层循环动态生成，静态数 `it(` 会少算。用 `vitest --reporter=json` 统计才准确。
 - Electron smoke：**54 项**（含错词本导航/双列/词义文案与 API 白名单哨兵）
 - 真实协议验证：`npm run verify:mcp`（**19 项**，真实 MCP stdio 握手，见 §7）
@@ -160,7 +160,7 @@ npm run verify:mcp
 
 ## 6. 已知不测的内容（诚实边界）
 
-- **真实模型诊断质量**：2026-11-12 已用真实 Key 跑通 D01 两条基准（CORRECT→PASS、WRONG→RETRY，validator 零 issues，providerId 确认为 `third-party-api`），见 `DELIVERY.md` 顶部复测记录；样本仅 2 条，误判率 / 证据准确率 / 对抗样本 / 跨模型兼容性仍未评测。
+- **真实模型诊断质量**：2026-11-12 已用真实 Key 跑通训练状态机 8 条路径（11 次模型调用，16 次 validator 判定零 issues，providerId 确认为 `third-party-api`），见 `DELIVERY.md` 顶部复测记录；样本集中在 D01 单句，误判率 / 证据准确率 / 9 条对抗样本 / 跨句跨模型兼容性仍未评测。
 - **真人 GUI 视觉验收**：自动化不截图比对像素；字号用 DOM 计算值验证，布局美观需人工看。
 - **其他 UI 组件**：`Library` 只在 smoke 里随默认视图渲染、无任何断言；`Profile` / `Focus` / `App` / `ErrorBoundary` / `kit` 在自动化测试里**从未被渲染**。Settings 也只覆盖 4 条路径，`handleToggle` / `handleDelete` 等零覆盖。这是当前最大的覆盖缺口。
 - **主进程真实 IPC handler**：smoke 自己注册 `ipcMain.handle`，不加载 `dist-electron/electron/main.js`，窗口安全策略与真实 handler 零覆盖。

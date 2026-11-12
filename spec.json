@@ -33,7 +33,7 @@
     "name": "IELTS Reading Lab",
     "packageName": "ielts-reading-lab",
     "packageVersion": "1.0.0",
-    "desktopRelease": "v10",
+    "desktopRelease": "v11",
     "description": "离线可用的 IELTS 学术长难句阅读训练桌面应用：100 篇原创文章、逐句中文参考理解、离线查词、中文自由表达诊断、L0–L3 渐进反馈，可选接入 OpenAI 兼容第三方 API。",
     "appType": "Electron 桌面应用（同时提供浏览器预览后端）",
     "platform": "Windows x64",
@@ -218,7 +218,7 @@
     "credential": "setApiKey 写入加密主机存储，永不回传明文；getApiConfig 仅返回 hasKey",
     "offlineFallback": "闸门不满足时用内部离线规则兜底，不展示为可选模型、不冒充模型输出",
     "settingsReadOnly": "学习历史个性化开关当前 core 未读取，UI 标注为只读",
-    "realModelStatus": "已于 2026-11-12 用真实 Key 复测通过：moyuu.cc/v1 + deepseek-v4.1-flash-1017，测试连接 HTTP 200，D01 正确/错误两条完整诊断均通过 validator（零 issues），providerId=third-party-api；11-10 的 503 为当时端点故障。样本仅 2 条，误判率 / 证据准确率 / 对抗样本 / 跨模型兼容性仍未评测",
+    "realModelStatus": "已于 2026-11-12 用真实 Key 复测通过：moyuu.cc/v1 + deepseek-v4.1-flash-1017；先跑 D01 两条诊断，再跑训练状态机 8 条路径共 11 次模型调用，16 次 validator 判定零 issues，providerId=third-party-api；11-10 的 503 为当时端点故障。样本集中在 D01 单句，误判率 / 证据准确率 / 对抗样本 / 跨模型兼容性仍未评测",
     "siwc": "官方 Sign in with ChatGPT 路线已按需求移除；阶段 0 真人授权 POC 结论 BLOCKED，见 docs/POC-RESULT.md（历史记录，不代表当前架构）"
   },
 
@@ -259,16 +259,16 @@
     "outputs": {
       "dist": "Vite 前端产物",
       "dist-electron": "编译后的主进程 / preload / core",
-      "release": "release/IELTS Reading Lab v10/IELTS Reading Lab.exe（便携版，约 180 MiB）"
+      "release": "release/IELTS Reading Lab v11/IELTS Reading Lab.exe（便携版，约 180 MiB）"
     },
     "freshnessGuard": "scripts/ensure-build.cjs：源码比 dist 新则自动重建，接入 smoke / verify:* / test:all，避免测到旧 bundle",
-    "launcher": "C:\\Users\\Razor\\Desktop\\IELTS Reading Lab.cmd（清除 ELECTRON_RUN_AS_NODE 后启动 v10 exe）",
+    "launcher": "C:\\Users\\Razor\\Desktop\\IELTS Reading Lab.cmd（清除 ELECTRON_RUN_AS_NODE 后启动 v11 exe）",
     "launcherCaveat": "该 .cmd 已被外部清理过七次；消失时可直接双击 release 内 exe 或重建该 5 行脚本",
     "electronBuilder": { "appId": "com.ieltsreadinglab.app", "targets": ["nsis", "zip"], "arch": "x64" }
   },
 
   "verification": {
-    "vitest": { "total": 213, "files": 25, "groups": { "root": 95, "unit": 49, "integration": 16, "component": 26, "regression": 27 } },
+    "vitest": { "total": 214, "files": 25, "groups": { "root": 95, "unit": 49, "integration": 16, "component": 26, "regression": 28 } },
     "smoke": { "checks": 54, "script": "scripts/smoke-electron.cjs", "scope": "真实 Electron + sql.js SQLite + preload sandbox + 打包文案与白名单" },
     "realInputChecks": [
       { "command": "npm run verify:mcp", "asserts": "真实 MCP stdio 握手 → tools/list 与 11 个只读工具 → 真实 SQLite 数据 → 路径穿越被拦 → 未知工具被拒（19 项）" },
@@ -283,7 +283,7 @@
     "uncovered": [
       "Profile / Focus / App / Library / ErrorBoundary / kit 无组件级行为测试；Settings 高危按钮零覆盖",
       "主进程真实 IPC handler 与窗口安全策略零覆盖（smoke 自行注册 handler）",
-      "真实模型诊断质量仅用 D01 两条基准验证（CORRECT→PASS / WRONG→RETRY，validator 零 issues）；误判率、证据准确率、对抗样本与跨模型兼容性未评测",
+      "真实模型链路已跑通 D01 单句的 8 条训练路径（11 次调用、validator 零 issues）；误判率、证据准确率、9 条对抗样本、跨句跨模型兼容性与超时/流式边界未评测",
       "真人 GUI 视觉验收、R03/R04/R06/R07 交互截图与 E2E 黄金路径缺失",
       "原计划 30 句 × 3 回答 ≈ 90 条基准与双人标注未达成",
       "性能、长时间运行、内存泄漏未测"

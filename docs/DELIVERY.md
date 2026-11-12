@@ -17,7 +17,25 @@
 
 修复后的 `SYSTEM_PROMPT` 在真实模型上生效：输出为纯 JSON、无 markdown 围栏、逐字引用准确、区间对应正确。§8 的 503 表格是 2026-11-10 当时的历史事实，不代表当前端点状态。
 
-**仍未验证**：样本仅 2 条；误判率 / 证据准确率 / 9 条对抗样本 / 跨模型兼容性 / 超时与流式边界均未评测。
+### 训练状态机全链路（真实模型，2026-11-12 复测）
+
+同一 provider 跑 8 条路径，共 11 次模型调用 / 8,879 prompt tokens / 2,321 completion tokens；**16 次 validator 判定全部 `valid=true, issues=[]`**。
+
+| 路径 | 结果 |
+|---|---|
+| P1 PASS → ACCEPT_TRANSFER → SUBMIT_TRANSFER | `COMPLETE`，`transferResult=correct`，排入 1 条延迟复测；作答前不泄漏迁移句参考含义，作答后才展示 |
+| P2a 错误 → 二次正确 | `RETRY → PASS`，二次表达上限内 |
+| P2b 错误 → 二次错误 | `RETRY → EXPLAIN`，`re-expression-limit-reached`，仅 1 条 full 反馈 |
+| P3 部分理解 → 修正 | `CLARIFY → PASS` |
+| P4 提示阶梯 | `L1 → L2 → L3`，第 3 次请求幂等、full 行数=1，L3 后不再提供 `REQUEST_HINT` / `UNLOCK_LEVEL3` |
+| P5 先解锁 L3 再答对 | `PASS`，反馈级别 3，notice 标明不计独立测评，决策含 `answer-already-revealed` |
+| P6 「不知道」 | `EXPLAIN`，决策同为 `EXPLAIN`、级别 3 |
+| P7 诊断失败 → 重试 | `DIAGNOSE_FAILED → PASS`，首次作答保留且不重复写 session |
+| P8 进入前看过解析 | 初始 `level=3 / revealed=true`，无 `UNLOCK_LEVEL3` |
+
+**发现并修复**：P2a / P3 这类「只用过 L1 提示」的 PASS 文案原本写「已看过答案」，但 `answerRevealed=false` 且 `decide()` 未标曝光，自相矛盾。已按 `sawAnswer` 与「用过提示」分叉，新增回归用例并做反向验证（改回旧文案 → 1 条 FAIL，恢复 → 8 项全过）。真实模型复跑确认修复生效。
+
+**仍未验证**：样本集中在 D01 单句 8 条路径；误判率 / 证据准确率 / 9 条对抗样本 / 跨句跨模型兼容性 / 超时与流式边界均未评测。
 
 
 ---
