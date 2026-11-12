@@ -160,7 +160,7 @@ npm run verify:mcp
 
 ## 6. 已知不测的内容（诚实边界）
 
-- **真实模型诊断质量**：没有真实 API Key 的成功输出，无法做误判率/证据准确率评测（见 `DELIVERY.md` §8）。
+- **真实模型诊断质量**：2026-11-12 已用真实 Key 跑通 D01 两条基准（CORRECT→PASS、WRONG→RETRY，validator 零 issues，providerId 确认为 `third-party-api`），见 `DELIVERY.md` 顶部复测记录；样本仅 2 条，误判率 / 证据准确率 / 对抗样本 / 跨模型兼容性仍未评测。
 - **真人 GUI 视觉验收**：自动化不截图比对像素；字号用 DOM 计算值验证，布局美观需人工看。
 - **其他 UI 组件**：`Library` 只在 smoke 里随默认视图渲染、无任何断言；`Profile` / `Focus` / `App` / `ErrorBoundary` / `kit` 在自动化测试里**从未被渲染**。Settings 也只覆盖 4 条路径，`handleToggle` / `handleDelete` 等零覆盖。这是当前最大的覆盖缺口。
 - **主进程真实 IPC handler**：smoke 自己注册 `ipcMain.handle`，不加载 `dist-electron/electron/main.js`，窗口安全策略与真实 handler 零覆盖。
